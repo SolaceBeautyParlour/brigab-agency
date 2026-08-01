@@ -79,7 +79,7 @@ async function forfeitBooking(booking) {
 /** Also sweeps expired 15-minute reservation holds back to 'available'. */
 async function releaseExpiredHolds() {
   await query(
-    "UPDATE beds SET status = 'available', hold_expires_at = NULL WHERE status = 'reserved_pending' AND hold_expires_at < now()"
+    "UPDATE beds SET status = 'available', hold_expires_at = NULL, held_by = NULL WHERE status = 'reserved_pending' AND hold_expires_at < now()"
   );
 }
 

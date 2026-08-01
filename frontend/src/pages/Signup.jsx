@@ -5,7 +5,7 @@ import PasswordField from "../components/PasswordField.jsx";
 
 export default function Signup({ onAuthed }) {
   const [role, setRole] = useState("student");
-  const [form, setForm] = useState({ name: "", email: "", phone: "", password: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", password: "", gender: "" });
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
@@ -67,6 +67,29 @@ export default function Signup({ onAuthed }) {
             className="w-full border border-ink/15 rounded-lg px-4 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-rust" />
           <span id="su-phone-hint" className="sr-only">Format: 0 followed by 9 digits, e.g. 024 123 4567</span>
         </div>
+        {role === "student" && (
+          <fieldset>
+            <legend className="text-xs text-ink/50 mb-1.5">
+              Gender — used to keep rooms from mixing genders
+            </legend>
+            <div className="flex gap-2">
+              {["male", "female"].map((g) => (
+                <label
+                  key={g}
+                  className={`flex-1 text-center capitalize text-sm border rounded-lg py-2.5 cursor-pointer transition-colors ${
+                    form.gender === g ? "bg-ink text-paper border-ink" : "border-ink/15 text-ink/60"
+                  }`}
+                >
+                  <input
+                    type="radio" name="gender" value={g} checked={form.gender === g}
+                    onChange={update("gender")} className="sr-only" required
+                  />
+                  {g}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        )}
         <div>
           <label htmlFor="su-password" className="sr-only">Password, minimum 8 characters</label>
           <PasswordField

@@ -25,10 +25,11 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX
 router.post("/hostels", async (req, res) => {
   const { name, area, genderPolicy, includes, depositPct } = req.body;
   const safeAmenities = sanitizeAmenities(includes, HOSTEL_AMENITIES);
+  const safeDepositPct = Math.min(1, Math.max(0.1, Number(depositPct) || 0.35));
   const result = await query(
     `INSERT INTO hostels (manager_id, name, area, gender_policy, includes, deposit_pct)
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [req.user.id, name, area, genderPolicy || "mixed", safeAmenities, depositPct || 0.35]
+    [req.user.id, name, area, genderPolicy || "mixed", safeAmenities, safeDepositPct]
   );
   res.status(201).json(result.rows[0]);
 });

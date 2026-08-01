@@ -19,7 +19,7 @@ router.post("/hold", requireAuth, requireRole("student"), async (req, res) => {
 
   const bedResult = await query(
     `SELECT b.*, r.price_per_year, r.room_code, r.hostel_id, h.deposit_pct, h.name AS hostel_name,
-            h.paystack_subaccount_code
+            h.paystack_subaccount_code, h.gender_policy
      FROM beds b
      JOIN rooms r ON r.id = b.room_id
      JOIN hostels h ON h.id = r.hostel_id
@@ -36,10 +36,36 @@ router.post("/hold", requireAuth, requireRole("student"), async (req, res) => {
     return res.status(422).json({ error: "This hostel hasn't finished payment setup yet — the manager needs to connect their Paystack account." });
   }
 
+  const student = (await query("SELECT gender FROM users WHERE id = $1", [req.user.id])).rows[0];
+
+  // Hostel-level policy: a male-only or female-only hostel shouldn't let the
+  // other gender book at all, regardless of which specific room/bed.
+  if (bed.gender_policy !== "mixed" && bed.gender_policy !== student.gender) {
+    return res.status(403).json({ error: `This hostel is for ${bed.gender_policy} students only.` });
+  }
+
+  // Room-level: even inside a "mixed" hostel, an individual room shouldn't
+  // end up with both genders in it. Checks against anyone already booked
+  // AND anyone actively mid-checkout (held_by) in the same room right now.
+  const roommates = await query(
+    `SELECT DISTINCT u.gender
+     FROM beds b2
+     LEFT JOIN bookings bk ON bk.bed_id = b2.id AND bk.status NOT IN ('forfeited', 'cancelled')
+     LEFT JOIN users u ON u.id = COALESCE(bk.student_id, b2.held_by)
+     WHERE b2.room_id = $1 AND b2.id != $2
+       AND (b2.status = 'taken' OR (b2.status = 'reserved_pending' AND b2.hold_expires_at > now()))
+       AND u.gender IS NOT NULL`,
+    [bed.room_id, bed.id]
+  );
+  const clashingGender = roommates.rows.find((r) => r.gender !== student.gender);
+  if (clashingGender) {
+    return res.status(409).json({ error: "This room already has a student of a different gender. Rooms can't mix genders." });
+  }
+
   const holdExpires = new Date(Date.now() + HOLD_MINUTES * 60 * 1000);
   await query(
-    "UPDATE beds SET status = 'reserved_pending', hold_expires_at = $1 WHERE id = $2",
-    [holdExpires, bed.id]
+    "UPDATE beds SET status = 'reserved_pending', hold_expires_at = $1, held_by = $2 WHERE id = $3",
+    [holdExpires, req.user.id, bed.id]
   );
 
   const minDeposit = Number(bed.price_per_year) * Number(bed.deposit_pct);

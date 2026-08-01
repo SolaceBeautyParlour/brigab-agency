@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT UNIQUE NOT NULL,
   phone TEXT NOT NULL,
   password_hash TEXT NOT NULL,
+  gender TEXT CHECK (gender IN ('male', 'female')), -- required for students at signup;
+  -- used to enforce hostel gender_policy and prevent opposite genders sharing a room
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -123,3 +125,12 @@ CREATE INDEX IF NOT EXISTS idx_waitlist_room ON waitlist_entries(room_id, positi
 -- ADD COLUMN IF NOT EXISTS makes this safe to re-run against a database that
 -- already has the rooms table from before this column existed.
 ALTER TABLE rooms ADD COLUMN IF NOT EXISTS amenities TEXT[] DEFAULT '{}';
+
+-- Same reasoning: users table already exists on deployed databases, so the
+-- gender column needs its own ALTER rather than relying on CREATE TABLE.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS gender TEXT CHECK (gender IN ('male', 'female'));
+
+-- Tracks WHO placed a 15-minute hold, not just that one exists — needed to
+-- catch a gender clash against someone mid-checkout in the same room, not
+-- only against someone who has already fully paid.
+ALTER TABLE beds ADD COLUMN IF NOT EXISTS held_by UUID REFERENCES users(id);

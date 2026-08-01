@@ -324,7 +324,7 @@ function NewHostelModal({ onClose, onCreated }) {
         </div>
         <label htmlFor="h-deposit" className="text-xs text-ink/50 block">
           Deposit percentage: <span aria-live="polite">{Math.round(form.depositPct * 100)}%</span>
-          <input id="h-deposit" type="range" min="0.1" max="0.6" step="0.05" value={form.depositPct}
+          <input id="h-deposit" type="range" min="0.1" max="1" step="0.05" value={form.depositPct}
             aria-valuetext={`${Math.round(form.depositPct * 100)} percent`}
             onChange={(e) => setForm((f) => ({ ...f, depositPct: Number(e.target.value) }))}
             className="w-full outline-none focus-visible:ring-2 focus-visible:ring-rust" />

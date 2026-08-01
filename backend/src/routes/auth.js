@@ -9,7 +9,7 @@ const GHANA_PHONE_RE = /^(\+233|0)[2357][0-9]{8}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 router.post("/signup", async (req, res) => {
-  const { role, name, phone, password } = req.body;
+  const { role, name, phone, password, gender } = req.body;
   const email = (req.body.email || "").trim().toLowerCase();
 
   if (!["student", "manager"].includes(role)) {
@@ -27,6 +27,12 @@ router.post("/signup", async (req, res) => {
   if (!password || password.length < 8) {
     return res.status(400).json({ error: "Password must be at least 8 characters" });
   }
+  // Only required for students — this is what lets us enforce a hostel's
+  // gender policy and stop opposite genders being placed in the same room.
+  // Managers don't need it.
+  if (role === "student" && !["male", "female"].includes(gender)) {
+    return res.status(400).json({ error: "Select male or female" });
+  }
 
   const existing = await query("SELECT id FROM users WHERE email = $1", [email]);
   if (existing.rows.length) {
@@ -35,9 +41,9 @@ router.post("/signup", async (req, res) => {
 
   const passwordHash = await bcrypt.hash(password, 10);
   const result = await query(
-    `INSERT INTO users (role, name, email, phone, password_hash)
-     VALUES ($1, $2, $3, $4, $5) RETURNING id, role, name, email, phone`,
-    [role, name.trim(), email, phone, passwordHash]
+    `INSERT INTO users (role, name, email, phone, password_hash, gender)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, role, name, email, phone, gender`,
+    [role, name.trim(), email, phone, passwordHash, role === "student" ? gender : null]
   );
 
   const user = result.rows[0];
