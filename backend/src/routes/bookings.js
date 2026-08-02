@@ -2,7 +2,7 @@ import express from "express";
 import crypto from "crypto";
 import { query } from "../db/pool.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
-import { initializeSplitTransaction } from "../services/paystack.js";
+import { initializeSplitTransaction, PAYSTACK_FEE_RATE, calculatePaystackFee } from "../services/paystack.js";
 
 const router = express.Router();
 const SERVICE_FEE = 50;
@@ -78,6 +78,7 @@ router.post("/hold", requireAuth, requireRole("student"), async (req, res) => {
     pricePerYear: Number(bed.price_per_year),
     minDeposit,
     serviceFee: SERVICE_FEE,
+    paystackFeeRate: PAYSTACK_FEE_RATE,
     holdExpiresAt: holdExpires,
     reference,
     subaccountCode: bed.paystack_subaccount_code,
@@ -115,7 +116,9 @@ router.post("/initialize-payment", requireAuth, requireRole("student"), async (r
     });
   }
 
-  const total = amount + SERVICE_FEE;
+  const subtotal = amount + SERVICE_FEE;
+  const paystackFee = calculatePaystackFee(subtotal);
+  const total = subtotal + paystackFee;
   const student = (await query("SELECT email FROM users WHERE id = $1", [req.user.id])).rows[0];
 
   const paystackData = await initializeSplitTransaction({

@@ -2,7 +2,7 @@ import express from "express";
 import crypto from "crypto";
 import { query, pool } from "../db/pool.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
-import { verifyTransaction } from "../services/paystack.js";
+import { verifyTransaction, PAYSTACK_FEE_RATE } from "../services/paystack.js";
 import { sendSMS, smsTemplates } from "../services/sms.js";
 import { sendReceiptEmail } from "../services/email.js";
 import { computeBalanceDueDate } from "../services/academicCalendar.js";
@@ -39,8 +39,11 @@ router.post("/verify", requireAuth, requireRole("student"), async (req, res) => 
   // Ground truth is what Paystack actually recorded, never a number the
   // client could have sent — that's what makes the flexible payment amount
   // safe. If someone tampered with the request, this is where it's caught.
+  // The total now includes a visible Paystack-fee line on top of deposit +
+  // service fee, so that has to come back out before we know the real deposit.
   const totalPaidGHS = Number(verified.amount) / 100;
-  const deposit = totalPaidGHS - SERVICE_FEE;
+  const paystackFeeActual = Math.round(totalPaidGHS * PAYSTACK_FEE_RATE * 100) / 100;
+  const deposit = totalPaidGHS - SERVICE_FEE - paystackFeeActual;
   const balance = Math.max(0, pricePerYear - deposit);
 
   if (deposit < minDeposit - 0.5) {

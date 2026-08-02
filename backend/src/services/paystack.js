@@ -3,6 +3,23 @@ import "dotenv/config";
 const PAYSTACK_BASE = "https://api.paystack.co";
 const SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 
+// Paystack's Ghana processing rate. Charged on every transaction regardless
+// of what we do — the only real decision is who visibly pays it. Passed
+// through to the student as a transparent line item (see bookings.js)
+// rather than silently eaten out of the hostel manager's settlement.
+export const PAYSTACK_FEE_RATE = 0.0198;
+
+/**
+ * Grosses up a subtotal so that, after Paystack takes its percentage cut of
+ * the FULL amount actually charged, the intended subtotal still lands
+ * untouched. Naively adding `subtotal * rate` undercharges slightly, since
+ * Paystack's fee is calculated on the larger, fee-inclusive total — this
+ * uses the standard tax/fee gross-up formula instead.
+ */
+export function calculatePaystackFee(subtotal) {
+  return Math.round(((subtotal * PAYSTACK_FEE_RATE) / (1 - PAYSTACK_FEE_RATE)) * 100) / 100;
+}
+
 async function paystackFetch(path, options = {}) {
   let res;
   try {
@@ -65,10 +82,17 @@ export async function initializeSplitTransaction({
       metadata,
       subaccount: subaccountCode,
       // `transaction_charge` is the slice that stays with the PLATFORM (Brigab) —
-      // i.e. the 50 GHS service fee. Everything else settles to the subaccount
-      // (the hostel manager), so Brigab never touches deposit/rent money.
+      // the service fee PLUS Paystack's own processing fee (see bookings.js,
+      // where the total charged to the student already includes both, added
+      // as a visible line item). Everything else settles to the subaccount
+      // (the hostel manager) untouched — they receive the full deposit amount,
+      // not deposit-minus-Paystack's-cut.
       transaction_charge: serviceFeePesewas,
-      bearer: "subaccount",
+      // "account" (not "subaccount") — Paystack's own fee now comes out of
+      // Brigab's cut, which is safe because that cut already has the fee
+      // baked into it by the caller. The manager's subaccount settlement is
+      // untouched by Paystack's fee either way.
+      bearer: "account",
     }),
   });
 }

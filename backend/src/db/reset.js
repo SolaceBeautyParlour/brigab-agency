@@ -23,7 +23,7 @@ If you're sure, run:
   console.log(`About to wipe all data at:\n  ${redactedUrl}\n`);
 
   await pool.query(`
-    TRUNCATE reminders_log, waitlist_entries, bookings, beds, rooms, hostels, users
+    TRUNCATE reminders_log, waitlist_entries, bookings, media, beds, rooms, hostels, users
     RESTART IDENTITY CASCADE;
   `);
 

@@ -22,6 +22,15 @@ export default function ReservationModal({ room, bed, onClose, onBooked }) {
       .catch((e) => { setError(e.message); setStage("error"); });
   }, [bed.id]);
 
+  // Mirrors the backend's gross-up formula exactly (see paystack.js) — this
+  // is only a live preview; the server recalculates and validates the real
+  // amount independently before ever charging anything.
+  const subtotal = hold ? amount + hold.serviceFee : 0;
+  const paystackFee = hold
+    ? Math.round(((subtotal * hold.paystackFeeRate) / (1 - hold.paystackFeeRate)) * 100) / 100
+    : 0;
+  const totalDue = subtotal + paystackFee;
+
   async function startPayment() {
     setStage("redirecting");
     try {
@@ -91,20 +100,22 @@ export default function ReservationModal({ room, bed, onClose, onBooked }) {
               <Row label="Paying now" value={cedis(amount)} tone="text-forest" />
               <Row label="Balance — due before move-in" value={cedis(hold.pricePerYear - amount)} />
               <Row label="Brigab service fee" value={cedis(hold.serviceFee)} />
-              <Row label="Total due today" value={cedis(amount + hold.serviceFee)} bold />
+              <Row label={`Payment processing fee (${(hold.paystackFeeRate * 100).toFixed(2)}%)`} value={cedis(paystackFee)} />
+              <Row label="Total due today" value={cedis(totalDue)} bold />
             </div>
 
             <p className="text-xs text-ink/50 leading-relaxed mb-5">
               Paying more now means less owed later — but this hostel requires at least{" "}
-              {cedis(hold.minDeposit)} to hold the room. The service fee is non-refundable.
-              This hold lasts 15 minutes — complete payment before then or the bed returns to the pool.
+              {cedis(hold.minDeposit)} to hold the room. The service fee and processing fee are
+              non-refundable. This hold lasts 15 minutes — complete payment before then or the
+              bed returns to the pool.
             </p>
 
             <button
               onClick={startPayment}
               className="w-full bg-ink text-paper rounded-full py-3 font-medium hover:bg-rust transition-colors outline-none focus-visible:ring-2 focus-visible:ring-rust focus-visible:ring-offset-2"
             >
-              Pay {cedis(amount + hold.serviceFee)} with Paystack
+              Pay {cedis(totalDue)} with Paystack
             </button>
           </>
         )}
