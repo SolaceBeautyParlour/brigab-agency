@@ -92,34 +92,43 @@ export default function Browse() {
           <Link
             key={h.id}
             to={`/hostels/${h.id}`}
-            className="text-left border border-ink/10 rounded-xl bg-white/60 p-5 hover:border-rust/40 hover:-translate-y-0.5 transition-all group block"
+            className="text-left border border-ink/10 rounded-xl bg-white/60 overflow-hidden hover:border-rust/40 hover:-translate-y-0.5 transition-all group block"
           >
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <h3 className="font-display text-lg text-ink">{h.name}</h3>
-                <p className="text-xs text-ink/50 flex items-center gap-1 mt-0.5">
-                  <MapPin size={12} /> {h.area}
-                </p>
+            <div className="w-full h-36 bg-ink/[0.06] flex items-center justify-center">
+              {h.cover_photo ? (
+                <img src={h.cover_photo} alt={`${h.name} cover photo`} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-ink/25 text-xs">No photo yet</span>
+              )}
+            </div>
+            <div className="p-5">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h3 className="font-display text-lg text-ink">{h.name}</h3>
+                  <p className="text-xs text-ink/50 flex items-center gap-1 mt-0.5">
+                    <MapPin size={12} /> {h.area}
+                  </p>
+                </div>
+                {h.verified && <ShieldCheck size={18} className="text-forest shrink-0" />}
               </div>
-              {h.verified && <ShieldCheck size={18} className="text-forest shrink-0" />}
-            </div>
 
-            <div className="flex gap-1.5 mb-4">
-              <span className="inline-flex rounded-full px-2.5 py-1 text-[11px] font-mono uppercase bg-ink/[0.06] text-ink/70">
-                {h.gender_policy}
-              </span>
-              <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-mono uppercase ${
-                Number(h.open_beds) > 0 ? "bg-forest/10 text-forest" : "bg-gold/15 text-[#7a5c14]"
-              }`}>
-                {Number(h.open_beds) > 0 ? `${h.open_beds} beds open` : "Full — waitlist"}
-              </span>
-            </div>
+              <div className="flex gap-1.5 mb-4">
+                <span className="inline-flex rounded-full px-2.5 py-1 text-[11px] font-mono uppercase bg-ink/[0.06] text-ink/70">
+                  {h.gender_policy}
+                </span>
+                <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-mono uppercase ${
+                  Number(h.open_beds) > 0 ? "bg-forest/10 text-forest" : "bg-gold/15 text-[#7a5c14]"
+                }`}>
+                  {Number(h.open_beds) > 0 ? `${h.open_beds} beds open` : "Full — waitlist"}
+                </span>
+              </div>
 
-            <div className="flex items-center justify-between pt-3 border-t border-ink/10">
-              <span className="font-mono text-sm text-ink">
-                from ₵{Number(h.from_price || 0).toLocaleString()}<span className="text-ink/40">/yr</span>
-              </span>
-              <ChevronRight size={16} className="text-ink/30 group-hover:text-rust group-hover:translate-x-0.5 transition-all" />
+              <div className="flex items-center justify-between pt-3 border-t border-ink/10">
+                <span className="font-mono text-sm text-ink">
+                  from ₵{Number(h.from_price || 0).toLocaleString()}<span className="text-ink/40">/yr</span>
+                </span>
+                <ChevronRight size={16} className="text-ink/30 group-hover:text-rust group-hover:translate-x-0.5 transition-all" />
+              </div>
             </div>
           </Link>
         ))}

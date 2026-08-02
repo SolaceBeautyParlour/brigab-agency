@@ -71,12 +71,14 @@ CREATE TABLE IF NOT EXISTS beds (
   UNIQUE(room_id, bed_index)
 );
 
--- Room photos/short clips. Only a lightweight URL + Cloudinary reference
--- lives here — actual files are never stored in Postgres, so this table
--- stays tiny no matter how many photos get uploaded.
+-- Room photos/short clips, OR a hostel's own cover photo — exactly one of
+-- room_id/hostel_id is set, never both, never neither. Only a lightweight
+-- URL + Cloudinary reference lives here — actual files are never stored in
+-- Postgres, so this table stays tiny no matter how many photos get uploaded.
 CREATE TABLE IF NOT EXISTS media (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+  room_id UUID REFERENCES rooms(id) ON DELETE CASCADE,
+  hostel_id UUID REFERENCES hostels(id) ON DELETE CASCADE,
   url TEXT NOT NULL,
   public_id TEXT NOT NULL, -- Cloudinary's reference, needed to delete the file later
   resource_type TEXT NOT NULL CHECK (resource_type IN ('image', 'video')),
@@ -134,3 +136,16 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS gender TEXT CHECK (gender IN ('male',
 -- catch a gender clash against someone mid-checkout in the same room, not
 -- only against someone who has already fully paid.
 ALTER TABLE beds ADD COLUMN IF NOT EXISTS held_by UUID REFERENCES users(id);
+
+-- Media used to only attach to rooms; this lets it attach to a hostel
+-- directly too (for a cover photo set at creation, before any room exists).
+ALTER TABLE media ALTER COLUMN room_id DROP NOT NULL;
+ALTER TABLE media ADD COLUMN IF NOT EXISTS hostel_id UUID REFERENCES hostels(id) ON DELETE CASCADE;
+
+-- Postgres has no ADD CONSTRAINT IF NOT EXISTS either — same DO-block fix
+-- as the enum types above.
+DO $$ BEGIN
+  ALTER TABLE media ADD CONSTRAINT media_belongs_to_one_parent
+    CHECK ((room_id IS NOT NULL AND hostel_id IS NULL) OR (room_id IS NULL AND hostel_id IS NOT NULL));
+EXCEPTION WHEN duplicate_object THEN null;
+END $$;

@@ -42,6 +42,12 @@ router.get("/hostels", async (req, res) => {
   // than trimming query complexity would.
   const result = await query(
     `SELECT h.*,
+            (SELECT COALESCE(
+               json_agg(
+                 json_build_object('id', m.id, 'url', m.url, 'resource_type', m.resource_type)
+                 ORDER BY m.created_at
+               ), '[]'
+             ) FROM media m WHERE m.hostel_id = h.id) AS media,
             COALESCE(
               json_agg(
                 json_build_object(
@@ -226,12 +232,57 @@ router.post("/rooms/:roomId/media", upload.single("file"), async (req, res) => {
   res.status(201).json(result.rows[0]);
 });
 
-/** Delete a room photo/clip — removes it from Cloudinary too, not just the DB row. */
+/**
+ * Upload a cover photo/clip for the HOSTEL itself — separate from room
+ * photos, since a hostel needs at least one image before any room exists
+ * (e.g. right at creation time, or a building-exterior shot).
+ */
+router.post("/hostels/:hostelId/media", upload.single("file"), async (req, res) => {
+  const owns = await query("SELECT id FROM hostels WHERE id = $1 AND manager_id = $2", [req.params.hostelId, req.user.id]);
+  if (!owns.rows.length) return res.status(403).json({ error: "You don't manage this hostel" });
+
+  if (!req.file) return res.status(400).json({ error: "No file was uploaded." });
+
+  const isImage = req.file.mimetype.startsWith("image/");
+  const isVideo = req.file.mimetype.startsWith("video/");
+  if (!isImage && !isVideo) {
+    return res.status(415).json({ error: "Only images and videos are supported." });
+  }
+  if (isImage && req.file.size > MAX_IMAGE_BYTES) {
+    return res.status(413).json({ error: `Images must be under ${MAX_IMAGE_BYTES / 1024 / 1024}MB.` });
+  }
+  if (isVideo && req.file.size > MAX_VIDEO_BYTES) {
+    return res.status(413).json({ error: `Video clips must be under ${MAX_VIDEO_BYTES / 1024 / 1024}MB — keep it short.` });
+  }
+
+  const countResult = await query("SELECT COUNT(*) FROM media WHERE hostel_id = $1", [req.params.hostelId]);
+  if (Number(countResult.rows[0].count) >= MAX_MEDIA_PER_ROOM) {
+    return res.status(409).json({ error: `A hostel can have at most ${MAX_MEDIA_PER_ROOM} photos/clips. Delete one to add another.` });
+  }
+
+  const resourceType = isImage ? "image" : "video";
+  let uploadResult;
+  try {
+    uploadResult = await uploadRoomMedia(req.file.buffer, resourceType);
+  } catch (err) {
+    return res.status(502).json({ error: "Upload to media storage failed. Please try again." });
+  }
+
+  const url = uploadResult.eager?.[0]?.secure_url || uploadResult.secure_url;
+
+  const result = await query(
+    `INSERT INTO media (hostel_id, url, public_id, resource_type) VALUES ($1, $2, $3, $4) RETURNING *`,
+    [req.params.hostelId, url, uploadResult.public_id, resourceType]
+  );
+  res.status(201).json(result.rows[0]);
+});
+
+/** Delete a room OR hostel photo/clip — removes it from Cloudinary too, not just the DB row. */
 router.delete("/media/:mediaId", async (req, res) => {
   const owns = await query(
     `SELECT m.* FROM media m
-     JOIN rooms r ON r.id = m.room_id
-     JOIN hostels h ON h.id = r.hostel_id
+     LEFT JOIN rooms r ON r.id = m.room_id
+     LEFT JOIN hostels h ON h.id = COALESCE(r.hostel_id, m.hostel_id)
      WHERE m.id = $1 AND h.manager_id = $2`,
     [req.params.mediaId, req.user.id]
   );

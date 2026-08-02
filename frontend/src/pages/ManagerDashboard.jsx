@@ -3,6 +3,7 @@ import { Wrench, Plus, Banknote, X } from "lucide-react";
 import { api } from "../api/client.js";
 import BedGrid from "../components/BedGrid.jsx";
 import AmenityChips from "../components/AmenityChips.jsx";
+import MediaGallery from "../components/MediaGallery.jsx";
 
 export default function ManagerDashboard() {
   const [hostels, setHostels] = useState([]);
@@ -99,6 +100,21 @@ export default function ManagerDashboard() {
               {h.name}
             </button>
           ))}
+        </div>
+      )}
+
+      {active && (
+        <div className="mb-6">
+          <p className="font-mono text-[11px] uppercase tracking-wide text-ink/50 mb-1.5">
+            {active.name} — cover photos
+          </p>
+          <MediaGallery
+            initialItems={active.media}
+            managerMode
+            uploadFn={(file) => api.uploadHostelMedia(active.id, file)}
+            altLabel={`${active.name} cover photo`}
+            onChanged={refreshHostels}
+          />
         </div>
       )}
 

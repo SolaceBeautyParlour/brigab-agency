@@ -69,6 +69,7 @@ export const api = {
   editRoom: (roomId, payload) => request(`/manager/rooms/${roomId}`, { method: "PATCH", body: payload }),
   deleteRoom: (roomId) => request(`/manager/rooms/${roomId}`, { method: "DELETE" }),
   uploadRoomMedia: (roomId, file) => uploadFile(`/manager/rooms/${roomId}/media`, file),
+  uploadHostelMedia: (hostelId, file) => uploadFile(`/manager/hostels/${hostelId}/media`, file),
   deleteMedia: (mediaId) => request(`/manager/media/${mediaId}`, { method: "DELETE" }),
   toggleBed: (bedId, status) => request(`/manager/beds/${bedId}`, { method: "PATCH", body: { status } }),
   managerBookings: (hostelId) => request(`/manager/hostels/${hostelId}/bookings`),

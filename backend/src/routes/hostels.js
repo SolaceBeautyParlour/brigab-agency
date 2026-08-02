@@ -72,6 +72,7 @@ router.get("/", async (req, res) => {
 
   const result = await query(
     `SELECT h.id, h.name, h.area, h.gender_policy, h.includes, h.verified,
+            (SELECT m.url FROM media m WHERE m.hostel_id = h.id AND m.resource_type = 'image' ORDER BY m.created_at LIMIT 1) AS cover_photo,
             COUNT(b.id) AS total_beds,
             COUNT(b.id) FILTER (WHERE b.status = 'available') AS open_beds,
             MIN(r.price_per_year) AS from_price
@@ -91,6 +92,12 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   const result = await query(
     `SELECT h.*,
+            (SELECT COALESCE(
+               json_agg(
+                 json_build_object('id', m.id, 'url', m.url, 'resource_type', m.resource_type)
+                 ORDER BY m.created_at
+               ), '[]'
+             ) FROM media m WHERE m.hostel_id = h.id) AS media,
             COALESCE(
               json_agg(
                 json_build_object(
