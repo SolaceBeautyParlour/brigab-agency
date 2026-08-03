@@ -40,9 +40,9 @@ export default function ReservationModal({ room, bed, onClose, onBooked }) {
         payAmount: amount,
         subaccountCode: hold.subaccountCode,
       });
-      // In production: window.location.href = payment.authorization_url;
-      // then Paystack redirects back to a /payment-callback route that calls
-      // api.verifyPayment({ reference, bedId }) before showing success.
+      // Paystack redirects to /payment-callback (see bookings.js for the
+      // callback_url construction), which is what actually calls
+      // /payments/verify and creates the booking.
       window.location.href = payment.authorization_url;
     } catch (e) {
       setError(e.message);

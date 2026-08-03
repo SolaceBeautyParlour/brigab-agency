@@ -8,6 +8,7 @@ import Login from "./pages/Login.jsx";
 import Signup from "./pages/Signup.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import ManagerDashboard from "./pages/ManagerDashboard.jsx";
+import PaymentCallback from "./pages/PaymentCallback.jsx";
 import RequireAuth from "./components/RequireAuth.jsx";
 import { sessionAuth } from "./api/client.js";
 
@@ -31,6 +32,10 @@ export default function App() {
           <Route
             path="/manager"
             element={<RequireAuth role="manager"><ManagerDashboard /></RequireAuth>}
+          />
+          <Route
+            path="/payment-callback"
+            element={<RequireAuth role="student"><PaymentCallback /></RequireAuth>}
           />
         </Routes>
       </main>

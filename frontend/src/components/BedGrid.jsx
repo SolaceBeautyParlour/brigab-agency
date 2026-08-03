@@ -67,7 +67,7 @@ export default function BedGrid({ rooms, onSelectRoom, managerMode, onToggleBed,
                   <button
                     key={bed.id}
                     type="button"
-                    onClick={() => onToggleBed(bed.id, available ? "taken" : "available")}
+                    onClick={() => onToggleBed(bed.id, available ? "taken" : "available", bed.status)}
                     aria-pressed={!available}
                     aria-label={`Bed ${i + 1} in room ${room.room_code} — ${available ? "available. Tap to mark taken." : "taken. Tap to mark available."}`}
                     className={`relative w-7 h-7 rounded-md flex items-center justify-center transition-colors outline-none

@@ -30,31 +30,62 @@ export default function ManagerDashboard() {
     if (activeId) api.managerBookings(activeId).then(setBookings);
   }, [activeId]);
 
-  async function toggleBed(bedId, status) {
-    // Update locally right away — we already know exactly what changed, so
-    // there's no reason to make the manager wait on a round trip to Render
-    // (which is a real, noticeable delay if you're testing from Ghana)
-    // just to see a bed flip. If the request fails, we roll the tap back.
-    const previous = hostels;
+  async function toggleBed(bedId, status, currentStatus) {
+    const isRiskyUncheck = currentStatus === "taken" && status !== "taken";
+
+    if (!isRiskyUncheck) {
+      // Safe case: update locally right away — no reason to make the manager
+      // wait on a round trip to Render (a real, noticeable delay testing from
+      // Ghana) just to see a bed flip. Roll back if the request fails.
+      const previous = hostels;
+      setHostels((prev) =>
+        prev.map((h) =>
+          h.id !== activeId
+            ? h
+            : { ...h, rooms: h.rooms.map((r) => ({ ...r, beds: r.beds.map((b) => (b.id === bedId ? { ...b, status } : b)) })) }
+        )
+      );
+      try {
+        await api.toggleBed(bedId, status);
+      } catch (err) {
+        setHostels(previous);
+      }
+      return;
+    }
+
+    // Risky case: this might displace a paying student. Wait for the
+    // server's answer before touching the UI at all.
+    try {
+      await api.toggleBed(bedId, status);
+    } catch (err) {
+      if (err.data?.booking) {
+        const b = err.data.booking;
+        const confirmed = window.confirm(
+          `${b.studentName} (${b.studentPhone}) has an active booking on this bed — they paid ₵${b.depositAmount}.\n\n` +
+          `Marking this bed available will CANCEL their booking. This can't be undone from here.\n\n` +
+          `Are you sure?`
+        );
+        if (!confirmed) return;
+
+        try {
+          await api.toggleBed(bedId, status, true);
+        } catch (err2) {
+          alert(err2.message || "Couldn't update this bed.");
+          return;
+        }
+      } else {
+        alert(err.message || "Couldn't update this bed.");
+        return;
+      }
+    }
+
     setHostels((prev) =>
       prev.map((h) =>
         h.id !== activeId
           ? h
-          : {
-              ...h,
-              rooms: h.rooms.map((r) => ({
-                ...r,
-                beds: r.beds.map((b) => (b.id === bedId ? { ...b, status } : b)),
-              })),
-            }
+          : { ...h, rooms: h.rooms.map((r) => ({ ...r, beds: r.beds.map((b) => (b.id === bedId ? { ...b, status } : b)) })) }
       )
     );
-
-    try {
-      await api.toggleBed(bedId, status);
-    } catch (err) {
-      setHostels(previous); // request failed — undo the optimistic flip
-    }
   }
 
   async function confirmDeleteRoom() {

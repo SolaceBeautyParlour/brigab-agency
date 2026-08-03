@@ -20,7 +20,12 @@ async function request(path, { method = "GET", body, auth = true } = {}) {
   });
 
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || "Request failed");
+  if (!res.ok) {
+    const err = new Error(data.error || "Request failed");
+    err.data = data; // callers that need more than the message (e.g. structured
+    // details like an affected booking) can read err.data.
+    throw err;
+  }
   return data;
 }
 
@@ -71,6 +76,6 @@ export const api = {
   uploadRoomMedia: (roomId, file) => uploadFile(`/manager/rooms/${roomId}/media`, file),
   uploadHostelMedia: (hostelId, file) => uploadFile(`/manager/hostels/${hostelId}/media`, file),
   deleteMedia: (mediaId) => request(`/manager/media/${mediaId}`, { method: "DELETE" }),
-  toggleBed: (bedId, status) => request(`/manager/beds/${bedId}`, { method: "PATCH", body: { status } }),
+  toggleBed: (bedId, status, confirmOverride) => request(`/manager/beds/${bedId}`, { method: "PATCH", body: { status, confirmOverride } }),
   managerBookings: (hostelId) => request(`/manager/hostels/${hostelId}/bookings`),
 };
