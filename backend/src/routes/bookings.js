@@ -121,6 +121,13 @@ router.post("/initialize-payment", requireAuth, requireRole("student"), async (r
   const total = subtotal + paystackFee;
   const student = (await query("SELECT email FROM users WHERE id = $1", [req.user.id])).rows[0];
 
+  // Paystack appends its own ?reference=...&trxref=... to whatever we send
+  // here, so bedId travels through as our own query param alongside those —
+  // without this, the frontend has no way to know which bed to verify
+  // against once the student lands back from Paystack's checkout page.
+  const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173").split(",")[0];
+  const callbackUrl = `${frontendUrl}/payment-callback?bedId=${bedId}`;
+
   const paystackData = await initializeSplitTransaction({
     email: student.email,
     amountGHS: total,
@@ -128,6 +135,7 @@ router.post("/initialize-payment", requireAuth, requireRole("student"), async (r
     subaccountCode,
     reference,
     metadata: { bedId, studentId: req.user.id },
+    callbackUrl,
   });
 
   res.json(paystackData); // contains authorization_url for the student to complete payment

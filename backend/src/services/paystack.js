@@ -67,6 +67,7 @@ export async function initializeSplitTransaction({
   subaccountCode,
   reference,
   metadata,
+  callbackUrl,
 }) {
   const amountPesewas = Math.round(amountGHS * 100);
   const serviceFeeGHS = amountGHS - depositGHS;
@@ -81,6 +82,7 @@ export async function initializeSplitTransaction({
       currency: "GHS",
       metadata,
       subaccount: subaccountCode,
+      callback_url: callbackUrl,
       // `transaction_charge` is the slice that stays with the PLATFORM (Brigab) —
       // the service fee PLUS Paystack's own processing fee (see bookings.js,
       // where the total charged to the student already includes both, added

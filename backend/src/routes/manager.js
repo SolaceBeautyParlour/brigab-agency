@@ -304,7 +304,7 @@ router.delete("/media/:mediaId", async (req, res) => {
  * enemy of managers actually keeping it updated.
  */
 router.patch("/beds/:bedId", async (req, res) => {
-  const { status } = req.body; // 'available' | 'taken' | 'maintenance'
+  const { status, confirmOverride } = req.body; // 'available' | 'taken' | 'maintenance'
 
   const bed = (await query(
     `SELECT b.*, r.hostel_id, r.id AS room_id, r.room_code, h.name AS hostel_name, h.manager_id
@@ -318,6 +318,38 @@ router.patch("/beds/:bedId", async (req, res) => {
   }
 
   const wasFullyTaken = bed.status === "taken";
+
+  // Unchecking a bed that has an actual paid booking on it is exactly how a
+  // student ends up silently un-housed while someone else gets waitlist-
+  // notified into their room. Block it unless the manager explicitly
+  // confirms, and show them who's actually affected first.
+  if (wasFullyTaken && status !== "taken") {
+    const activeBooking = (await query(
+      `SELECT bo.id, bo.status, bo.deposit_amount, u.name AS student_name, u.phone AS student_phone
+       FROM bookings bo JOIN users u ON u.id = bo.student_id
+       WHERE bo.bed_id = $1 AND bo.status NOT IN ('forfeited', 'cancelled')
+       ORDER BY bo.created_at DESC LIMIT 1`,
+      [bed.id]
+    )).rows[0];
+
+    if (activeBooking && !confirmOverride) {
+      return res.status(409).json({
+        error: "This bed has an active booking. Confirm to override.",
+        booking: {
+          studentName: activeBooking.student_name,
+          studentPhone: activeBooking.student_phone,
+          depositAmount: activeBooking.deposit_amount,
+        },
+      });
+    }
+
+    if (activeBooking && confirmOverride) {
+      // Keep the booking record honest — it shouldn't still say
+      // "deposit_paid" while the bed itself says available again.
+      await query("UPDATE bookings SET status = 'cancelled' WHERE id = $1", [activeBooking.id]);
+    }
+  }
+
   await query("UPDATE beds SET status = $1, hold_expires_at = NULL WHERE id = $2", [status, req.params.bedId]);
 
   // Marking a bed vacated kicks off the waitlist notification chain automatically.

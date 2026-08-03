@@ -93,4 +93,6 @@ export const smsTemplates = {
     `Hi ${name}, your room reservation has been released after non-payment of balance. Your deposit is non-refundable per our policy. — Brigab`,
   waitlistClaim: (name, hostelName, roomCode) =>
     `Hi ${name}, a bed just opened up at ${hostelName} (room ${roomCode})! You have 24 hours to claim it on Brigab before it passes to the next student.`,
+  newBookingManager: (studentName, roomCode, depositAmount) =>
+    `New booking at your hostel! ${studentName} just paid GHS ${depositAmount} for room ${roomCode}. Check your Brigab dashboard for details.`,
 };

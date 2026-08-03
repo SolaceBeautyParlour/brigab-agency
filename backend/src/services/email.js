@@ -40,3 +40,33 @@ export async function sendReceiptEmail({ to, name, hostelName, roomCode, deposit
     html,
   });
 }
+
+export async function sendManagerBookingEmail({ to, managerName, studentName, studentPhone, hostelName, roomCode, depositAmount, balanceAmount }) {
+  const html = `
+    <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2 style="color:#16213A;">New booking at ${hostelName}</h2>
+      <p>Hi ${managerName}, a student just secured room ${roomCode}.</p>
+      <table style="width:100%; border-collapse: collapse; font-size: 14px;">
+        <tr><td style="padding:6px 0; color:#666;">Student</td><td style="text-align:right;">${studentName}</td></tr>
+        <tr><td style="padding:6px 0; color:#666;">Phone</td><td style="text-align:right;">${studentPhone}</td></tr>
+        <tr><td style="padding:6px 0; color:#666;">Deposit received</td><td style="text-align:right;">GHS ${depositAmount}</td></tr>
+        <tr><td style="padding:6px 0; color:#666;">Balance remaining</td><td style="text-align:right;">GHS ${balanceAmount}</td></tr>
+      </table>
+      <p style="color:#888; font-size:12px; margin-top:24px;">
+        The deposit has settled directly to your connected bank account via Paystack. Check your Brigab manager dashboard for the full booking list.
+      </p>
+    </div>
+  `;
+
+  if (!transporter) {
+    console.log(`[Email - not configured, logging only] to ${to}: new booking notification for room ${roomCode}`);
+    return { skipped: true };
+  }
+
+  return transporter.sendMail({
+    from: `"Brigab Agency" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+    to,
+    subject: `New booking: room ${roomCode} at ${hostelName}`,
+    html,
+  });
+}

@@ -4,7 +4,7 @@ import { query, pool } from "../db/pool.js";
 import { requireAuth, requireRole } from "../middleware/auth.js";
 import { verifyTransaction, PAYSTACK_FEE_RATE } from "../services/paystack.js";
 import { sendSMS, smsTemplates } from "../services/sms.js";
-import { sendReceiptEmail } from "../services/email.js";
+import { sendReceiptEmail, sendManagerBookingEmail } from "../services/email.js";
 import { computeBalanceDueDate } from "../services/academicCalendar.js";
 
 const router = express.Router();
@@ -83,7 +83,11 @@ router.post("/verify", requireAuth, requireRole("student"), async (req, res) => 
   try {
     const student = (await query("SELECT name, email, phone FROM users WHERE id = $1", [req.user.id])).rows[0];
     const hostelInfo = (await query(
-      `SELECT h.name AS hostel_name, r.room_code FROM rooms r JOIN hostels h ON h.id = r.hostel_id WHERE r.id = (SELECT room_id FROM beds WHERE id = $1)`,
+      `SELECT h.name AS hostel_name, r.room_code, u.name AS manager_name, u.email AS manager_email, u.phone AS manager_phone
+       FROM rooms r
+       JOIN hostels h ON h.id = r.hostel_id
+       JOIN users u ON u.id = h.manager_id
+       WHERE r.id = (SELECT room_id FROM beds WHERE id = $1)`,
       [bedId]
     )).rows[0];
 
@@ -98,6 +102,20 @@ router.post("/verify", requireAuth, requireRole("student"), async (req, res) => 
       balance,
       dueDate: balanceDueDate.toDateString(),
       reference,
+    });
+
+    // The manager should know a real booking just happened too — not just
+    // see it passively next time they happen to open their dashboard.
+    await sendSMS(hostelInfo.manager_phone, smsTemplates.newBookingManager(student.name, hostelInfo.room_code, deposit));
+    await sendManagerBookingEmail({
+      to: hostelInfo.manager_email,
+      managerName: hostelInfo.manager_name,
+      studentName: student.name,
+      studentPhone: student.phone,
+      hostelName: hostelInfo.hostel_name,
+      roomCode: hostelInfo.room_code,
+      depositAmount: deposit,
+      balanceAmount: balance,
     });
   } catch (notifyErr) {
     console.error("Booking succeeded but notification failed:", notifyErr);
