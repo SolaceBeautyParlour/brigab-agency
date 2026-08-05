@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Search, MapPin, ShieldCheck, ChevronRight, SlidersHorizontal } from "lucide-react";
 import { api } from "../api/client.js";
 import FilterPanel from "../components/FilterPanel.jsx";
+import LoadingState from "../components/LoadingState.jsx";
 
 const EMPTY_FILTERS = { minPrice: "", maxPrice: "", roomTypes: [], hostelAmenities: [], roomAmenities: [] };
 
@@ -11,6 +12,7 @@ export default function Browse() {
   const [query, setQuery] = useState("");
   const [gender, setGender] = useState("any");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [amenityOptions, setAmenityOptions] = useState({});
@@ -30,8 +32,10 @@ export default function Browse() {
 
   useEffect(() => {
     setLoading(true);
+    setLoadError("");
     api.browseHostels({ search: query, gender, ...filters })
       .then(setHostels)
+      .catch((err) => setLoadError(err.message || "Couldn't load hostels."))
       .finally(() => setLoading(false));
   }, [query, gender, filters]);
 
@@ -84,8 +88,23 @@ export default function Browse() {
       </section>
 
       <section className="px-6 sm:px-10 py-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {loading && <p className="text-ink/40 text-sm">Loading hostels…</p>}
-        {!loading && hostels.length === 0 && (
+        {loading && (
+          <div className="col-span-full">
+            <LoadingState message="Loading hostels…" />
+          </div>
+        )}
+        {!loading && loadError && (
+          <div className="col-span-full text-center py-10">
+            <p className="text-sm text-ink/60 mb-4">{loadError}</p>
+            <button
+              onClick={() => setFilters({ ...filters })}
+              className="bg-ink text-paper rounded-full px-5 py-2 text-sm font-medium hover:bg-rust"
+            >
+              Try again
+            </button>
+          </div>
+        )}
+        {!loading && !loadError && hostels.length === 0 && (
           <p className="text-ink/40 text-sm">No hostels match that search yet.</p>
         )}
         {hostels.map((h) => (

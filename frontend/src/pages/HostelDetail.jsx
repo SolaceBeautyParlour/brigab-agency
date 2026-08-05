@@ -4,17 +4,25 @@ import { ArrowLeft, MapPin, ShieldCheck, LayoutGrid, BedDouble } from "lucide-re
 import { api, sessionAuth } from "../api/client.js";
 import BedGrid from "../components/BedGrid.jsx";
 import ReservationModal from "../components/ReservationModal.jsx";
+import LoadingState from "../components/LoadingState.jsx";
 
 export default function HostelDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [hostel, setHostel] = useState(null);
+  const [loadError, setLoadError] = useState("");
   const [reserving, setReserving] = useState(null); // { room, bed }
   const [waitlistNotice, setWaitlistNotice] = useState(null);
 
-  useEffect(() => {
-    api.getHostel(id).then(setHostel);
-  }, [id]);
+  function load() {
+    setLoadError("");
+    setHostel(null);
+    api.getHostel(id)
+      .then(setHostel)
+      .catch((err) => setLoadError(err.message || "Couldn't load this hostel."));
+  }
+
+  useEffect(load, [id]);
 
   async function handleSelectRoom(room, isFull) {
     if (!sessionAuth.token) {
@@ -30,7 +38,21 @@ export default function HostelDetail() {
     setReserving({ room, bed: openBed });
   }
 
-  if (!hostel) return <p className="px-6 sm:px-10 py-10 text-ink/40">Loading…</p>;
+  if (loadError) {
+    return (
+      <div className="px-6 sm:px-10 py-16 text-center">
+        <p className="text-sm text-ink/60 mb-4">{loadError}</p>
+        <button
+          onClick={load}
+          className="bg-ink text-paper rounded-full px-5 py-2 text-sm font-medium hover:bg-rust"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  if (!hostel) return <LoadingState message="Loading hostel…" fullPage />;
 
   const openBeds = hostel.rooms.reduce(
     (n, r) => n + r.beds.filter((b) => b.status === "available").length,

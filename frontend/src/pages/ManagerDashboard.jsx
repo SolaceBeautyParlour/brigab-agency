@@ -4,10 +4,13 @@ import { api } from "../api/client.js";
 import BedGrid from "../components/BedGrid.jsx";
 import AmenityChips from "../components/AmenityChips.jsx";
 import MediaGallery from "../components/MediaGallery.jsx";
+import LoadingState from "../components/LoadingState.jsx";
 
 export default function ManagerDashboard() {
   const [hostels, setHostels] = useState([]);
   const [activeId, setActiveId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [showNewHostel, setShowNewHostel] = useState(false);
   const [showNewRoom, setShowNewRoom] = useState(false);
   const [editingRoom, setEditingRoom] = useState(null);
@@ -18,10 +21,14 @@ export default function ManagerDashboard() {
   const active = hostels.find((h) => h.id === activeId);
 
   function refreshHostels() {
-    api.managerHostels().then((list) => {
-      setHostels(list);
-      if (!activeId && list.length) setActiveId(list[0].id);
-    });
+    setLoadError("");
+    api.managerHostels()
+      .then((list) => {
+        setHostels(list);
+        if (!activeId && list.length) setActiveId(list[0].id);
+      })
+      .catch((err) => setLoadError(err.message || "Couldn't load your hostels."))
+      .finally(() => setLoading(false));
   }
 
   useEffect(() => { refreshHostels(); }, []);
@@ -99,6 +106,22 @@ export default function ManagerDashboard() {
     }
   }
 
+  if (loading) return <LoadingState message="Loading your hostels…" fullPage />;
+
+  if (loadError && hostels.length === 0) {
+    return (
+      <div className="px-6 sm:px-10 py-16 text-center">
+        <p className="text-sm text-ink/60 mb-4">{loadError}</p>
+        <button
+          onClick={() => { setLoading(true); refreshHostels(); }}
+          className="bg-ink text-paper rounded-full px-5 py-2 text-sm font-medium hover:bg-rust"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="px-6 sm:px-10 py-8 max-w-3xl">
       <div className="flex items-center gap-2 mb-1">
@@ -140,6 +163,7 @@ export default function ManagerDashboard() {
             {active.name} — cover photos
           </p>
           <MediaGallery
+            key={active.id}
             initialItems={active.media}
             managerMode
             uploadFn={(file) => api.uploadHostelMedia(active.id, file)}
