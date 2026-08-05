@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useId } from "react";
-import { Wrench, Plus, Banknote, X } from "lucide-react";
+import { Wrench, Plus, Banknote, X, Trash2 } from "lucide-react";
 import { api } from "../api/client.js";
 import BedGrid from "../components/BedGrid.jsx";
 import AmenityChips from "../components/AmenityChips.jsx";
@@ -16,6 +16,8 @@ export default function ManagerDashboard() {
   const [editingRoom, setEditingRoom] = useState(null);
   const [deletingRoom, setDeletingRoom] = useState(null);
   const [deleteError, setDeleteError] = useState("");
+  const [deletingHostel, setDeletingHostel] = useState(false);
+  const [deleteHostelError, setDeleteHostelError] = useState("");
   const [bookings, setBookings] = useState([]);
 
   const active = hostels.find((h) => h.id === activeId);
@@ -106,6 +108,18 @@ export default function ManagerDashboard() {
     }
   }
 
+  async function confirmDeleteHostel() {
+    setDeleteHostelError("");
+    try {
+      await api.deleteHostel(active.id);
+      setDeletingHostel(false);
+      setActiveId(null);
+      refreshHostels();
+    } catch (err) {
+      setDeleteHostelError(err.message || "Couldn't delete this hostel.");
+    }
+  }
+
   if (loading) return <LoadingState message="Loading your hostels…" fullPage />;
 
   if (loadError && hostels.length === 0) {
@@ -159,9 +173,19 @@ export default function ManagerDashboard() {
 
       {active && (
         <div className="mb-6">
-          <p className="font-mono text-[11px] uppercase tracking-wide text-ink/50 mb-1.5">
-            {active.name} — cover photos
-          </p>
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="font-mono text-[11px] uppercase tracking-wide text-ink/50">
+              {active.name} — cover photos
+            </p>
+            <button
+              type="button"
+              onClick={() => { setDeleteHostelError(""); setDeletingHostel(true); }}
+              aria-label={`Delete ${active.name}`}
+              className="flex items-center gap-1 text-xs text-ink/40 hover:text-rust outline-none focus-visible:ring-2 focus-visible:ring-rust rounded"
+            >
+              <Trash2 size={13} /> Delete hostel
+            </button>
+          </div>
           <MediaGallery
             key={active.id}
             initialItems={active.media}
@@ -268,6 +292,33 @@ export default function ManagerDashboard() {
               className="flex-1 bg-rust text-paper rounded-full py-2.5 text-sm font-medium hover:opacity-90 outline-none focus-visible:ring-2 focus-visible:ring-rust"
             >
               Delete room
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {deletingHostel && active && (
+        <Modal onClose={() => setDeletingHostel(false)} title={`Delete ${active.name}?`}>
+          <p className="text-sm text-ink/60 mb-4">
+            This removes the entire hostel — every room, bed, and photo in it — from the site.
+            This can't be undone. If any bed in this hostel has booking history, deletion will
+            be blocked instead; mark beds as unavailable if the hostel is just no longer active.
+          </p>
+          {deleteHostelError && <p role="alert" className="text-rust text-sm mb-3">{deleteHostelError}</p>}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setDeletingHostel(false)}
+              className="flex-1 border border-ink/15 rounded-full py-2.5 text-sm font-medium hover:bg-ink/5 outline-none focus-visible:ring-2 focus-visible:ring-rust"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmDeleteHostel}
+              className="flex-1 bg-rust text-paper rounded-full py-2.5 text-sm font-medium hover:opacity-90 outline-none focus-visible:ring-2 focus-visible:ring-rust"
+            >
+              Delete hostel
             </button>
           </div>
         </Modal>

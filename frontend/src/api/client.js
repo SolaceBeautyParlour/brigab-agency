@@ -120,6 +120,7 @@ export const api = {
 
   managerHostels: () => request("/manager/hostels"),
   createHostel: (payload) => request("/manager/hostels", { method: "POST", body: payload }),
+  deleteHostel: (hostelId) => request(`/manager/hostels/${hostelId}`, { method: "DELETE" }),
   connectPaystack: (hostelId, payload) => request(`/manager/hostels/${hostelId}/connect-paystack`, { method: "POST", body: payload }),
   listBanks: () => request("/manager/banks"),
   createRoom: (hostelId, payload) => request(`/manager/hostels/${hostelId}/rooms`, { method: "POST", body: payload }),

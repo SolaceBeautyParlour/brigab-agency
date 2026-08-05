@@ -181,6 +181,47 @@ router.delete("/rooms/:roomId", async (req, res) => {
 });
 
 /**
+ * Delete a hostel entirely — its rooms, beds, and media cascade with it.
+ * Blocked at the database level (same mechanism as room deletion) if any
+ * bed anywhere in the hostel has booking history — a hostel that's had
+ * real students in it can't just vanish.
+ */
+router.delete("/hostels/:hostelId", async (req, res) => {
+  const owns = await query("SELECT id FROM hostels WHERE id = $1 AND manager_id = $2", [req.params.hostelId, req.user.id]);
+  if (!owns.rows.length) return res.status(403).json({ error: "You don't manage this hostel" });
+
+  // Clean up Cloudinary before the DB rows disappear — CASCADE deletes the
+  // media rows automatically, but doesn't know to also delete the actual
+  // files sitting on Cloudinary, which would otherwise just orphan there.
+  const allMedia = await query(
+    `SELECT public_id, resource_type FROM media WHERE hostel_id = $1
+     UNION
+     SELECT m.public_id, m.resource_type FROM media m
+     JOIN rooms r ON r.id = m.room_id WHERE r.hostel_id = $1`,
+    [req.params.hostelId]
+  );
+  for (const m of allMedia.rows) {
+    try {
+      await deleteRoomMedia(m.public_id, m.resource_type);
+    } catch (err) {
+      console.error("Cloudinary cleanup failed for one file (continuing):", err.message);
+    }
+  }
+
+  try {
+    await query("DELETE FROM hostels WHERE id = $1", [req.params.hostelId]);
+  } catch (err) {
+    if (err.code === "23503") {
+      return res.status(409).json({
+        error: "This hostel has booking history and can't be deleted. Mark its beds as unavailable instead if it's no longer in use.",
+      });
+    }
+    throw err;
+  }
+  res.status(204).end();
+});
+
+/**
  * Upload a photo or short clip for a room. Files are streamed straight to
  * Cloudinary — never written to this server's disk and never stored in
  * Postgres — so uploads can never bloat the database, no matter how many
