@@ -52,6 +52,18 @@ CREATE TABLE IF NOT EXISTS hostels (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Coordinates each of KNUST's fixed access points geocode to. Geocoded once
+-- per landmark, ever — coordinates for a real place don't change, so there's
+-- no reason to hit the geocoding API again once a landmark is cached here.
+CREATE TABLE IF NOT EXISTS landmarks (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT UNIQUE NOT NULL,
+  search_query TEXT NOT NULL,
+  latitude NUMERIC(10,7),
+  longitude NUMERIC(10,7),
+  geocoded_at TIMESTAMPTZ
+);
+
 CREATE TABLE IF NOT EXISTS rooms (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   hostel_id UUID NOT NULL REFERENCES hostels(id) ON DELETE CASCADE,
@@ -149,3 +161,12 @@ DO $$ BEGIN
     CHECK ((room_id IS NOT NULL AND hostel_id IS NULL) OR (room_id IS NULL AND hostel_id IS NOT NULL));
 EXCEPTION WHEN duplicate_object THEN null;
 END $$;
+
+-- Manager-set pin location and pre-computed walking distances to KNUST's
+-- fixed access points. landmark_distances is computed ONCE when the manager
+-- sets/updates the pin — never recalculated per page view — which is what
+-- keeps this comfortably inside a free routing API's daily quota regardless
+-- of how many students browse the site.
+ALTER TABLE hostels ADD COLUMN IF NOT EXISTS latitude NUMERIC(10,7);
+ALTER TABLE hostels ADD COLUMN IF NOT EXISTS longitude NUMERIC(10,7);
+ALTER TABLE hostels ADD COLUMN IF NOT EXISTS landmark_distances JSONB DEFAULT '{}';

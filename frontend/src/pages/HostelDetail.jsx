@@ -74,6 +74,17 @@ export default function HostelDetail() {
             {hostel.verified && <ShieldCheck size={20} className="text-forest" />}
           </div>
           <p className="text-sm text-ink/50 flex items-center gap-1"><MapPin size={13} /> {hostel.area}</p>
+          {hostel.landmark_distances && Object.keys(hostel.landmark_distances).length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {Object.entries(hostel.landmark_distances)
+                .sort((a, b) => a[1].minutes - b[1].minutes)
+                .map(([name, d]) => (
+                  <span key={name} className="text-xs px-2.5 py-1 rounded-full bg-forest/10 text-forest">
+                    {d.minutes} min walk to {name}
+                  </span>
+                ))}
+            </div>
+          )}
         </div>
         <div className="flex gap-1.5 flex-wrap">
           {(hostel.includes || []).map((i) => (

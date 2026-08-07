@@ -11,6 +11,8 @@ import {
   MAX_MEDIA_PER_ROOM,
 } from "../services/cloudinaryMedia.js";
 import { HOSTEL_AMENITIES, ROOM_AMENITIES, sanitizeAmenities } from "../constants/amenities.js";
+import { KNUST_LANDMARKS } from "../constants/landmarks.js";
+import { geocode, getWalkingDistance } from "../services/openRouteService.js";
 import { notifyNextInWaitlist } from "./waitlist.js";
 
 const router = express.Router();
@@ -133,6 +135,86 @@ router.post("/hostels/:hostelId/rooms", async (req, res) => {
  * minefield (which bed does a paid student lose?). Managers can still
  * delete+recreate an empty room if they need a different bed count.
  */
+/**
+ * Live address search while the manager is placing their pin. Proxied
+ * through our backend (rather than called directly from the browser) so we
+ * control the API key and the required User-Agent, and so the free daily
+ * quota is shared sensibly across every manager rather than each browser
+ * hitting the geocoder on its own.
+ */
+router.get("/geocode-search", async (req, res) => {
+  const { q } = req.query;
+  if (!q || q.trim().length < 3) return res.json([]);
+  try {
+    const results = await geocode(q);
+    res.json(results);
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+/**
+ * Looks up a landmark's coordinates once, ever — cached in the `landmarks`
+ * table permanently after the first successful geocode, since a real
+ * place's coordinates don't change. Every hostel that sets a pin after
+ * that reuses the cached value instead of re-geocoding the same landmark.
+ */
+async function getOrGeocodeLandmark(landmark) {
+  const cached = (await query("SELECT * FROM landmarks WHERE name = $1", [landmark.name])).rows[0];
+  if (cached?.latitude != null) return cached;
+
+  const results = await geocode(landmark.searchQuery);
+  if (!results.length) throw new Error(`Couldn't find "${landmark.name}" — check the search query.`);
+  const { latitude, longitude } = results[0];
+
+  const saved = await query(
+    `INSERT INTO landmarks (name, search_query, latitude, longitude, geocoded_at)
+     VALUES ($1, $2, $3, $4, now())
+     ON CONFLICT (name) DO UPDATE SET latitude = $3, longitude = $4, geocoded_at = now()
+     RETURNING *`,
+    [landmark.name, landmark.searchQuery, latitude, longitude]
+  );
+  return saved.rows[0];
+}
+
+/**
+ * Sets a hostel's pin location and computes walking distance to every
+ * KNUST landmark — ONCE, right now, not on every future page view. This is
+ * the one and only place that calls the routing API for a given hostel
+ * update, which is what keeps this comfortably inside a free daily quota
+ * no matter how many students later browse the site.
+ */
+router.patch("/hostels/:hostelId/location", async (req, res) => {
+  const { latitude, longitude } = req.body;
+  const owns = await query("SELECT id FROM hostels WHERE id = $1 AND manager_id = $2", [req.params.hostelId, req.user.id]);
+  if (!owns.rows.length) return res.status(403).json({ error: "You don't manage this hostel" });
+
+  if (typeof latitude !== "number" || typeof longitude !== "number") {
+    return res.status(400).json({ error: "A valid latitude and longitude are required." });
+  }
+
+  const distances = {};
+  const errors = [];
+  for (const landmark of KNUST_LANDMARKS) {
+    try {
+      const point = await getOrGeocodeLandmark(landmark);
+      const { minutes, meters } = await getWalkingDistance(latitude, longitude, point.latitude, point.longitude);
+      distances[landmark.name] = { minutes, meters };
+    } catch (err) {
+      // One landmark failing (e.g. genuinely unreachable on foot) shouldn't
+      // block the others or the pin save itself — surface it, don't crash.
+      errors.push(`${landmark.name}: ${err.message}`);
+    }
+  }
+
+  const result = await query(
+    "UPDATE hostels SET latitude = $1, longitude = $2, landmark_distances = $3 WHERE id = $4 RETURNING *",
+    [latitude, longitude, JSON.stringify(distances), req.params.hostelId]
+  );
+
+  res.json({ hostel: result.rows[0], warnings: errors });
+});
+
 router.patch("/rooms/:roomId", async (req, res) => {
   const { roomCode, roomType, pricePerYear, amenities } = req.body;
   const safeAmenities = sanitizeAmenities(amenities, ROOM_AMENITIES);

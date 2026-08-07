@@ -120,6 +120,9 @@ export const api = {
 
   managerHostels: () => request("/manager/hostels"),
   createHostel: (payload) => request("/manager/hostels", { method: "POST", body: payload }),
+  geocodeSearch: (q) => request(`/manager/geocode-search?q=${encodeURIComponent(q)}`),
+  updateHostelLocation: (hostelId, latitude, longitude) =>
+    request(`/manager/hostels/${hostelId}/location`, { method: "PATCH", body: { latitude, longitude } }),
   deleteHostel: (hostelId) => request(`/manager/hostels/${hostelId}`, { method: "DELETE" }),
   connectPaystack: (hostelId, payload) => request(`/manager/hostels/${hostelId}/connect-paystack`, { method: "POST", body: payload }),
   listBanks: () => request("/manager/banks"),

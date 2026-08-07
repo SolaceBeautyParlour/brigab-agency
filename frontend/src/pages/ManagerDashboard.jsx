@@ -4,6 +4,7 @@ import { api } from "../api/client.js";
 import BedGrid from "../components/BedGrid.jsx";
 import AmenityChips from "../components/AmenityChips.jsx";
 import MediaGallery from "../components/MediaGallery.jsx";
+import MapPicker from "../components/MapPicker.jsx";
 import LoadingState from "../components/LoadingState.jsx";
 
 export default function ManagerDashboard() {
@@ -194,6 +195,33 @@ export default function ManagerDashboard() {
             altLabel={`${active.name} cover photo`}
             onChanged={refreshHostels}
           />
+        </div>
+      )}
+
+      {active && (
+        <div className="mb-6">
+          <p className="font-mono text-[11px] uppercase tracking-wide text-ink/50 mb-1.5">
+            {active.name} — location
+          </p>
+          <MapPicker
+            key={active.id}
+            initialLat={active.latitude}
+            initialLng={active.longitude}
+            onSave={async (lat, lng) => {
+              const result = await api.updateHostelLocation(active.id, lat, lng);
+              refreshHostels();
+              return result;
+            }}
+          />
+          {active.landmark_distances && Object.keys(active.landmark_distances).length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              {Object.entries(active.landmark_distances).map(([name, d]) => (
+                <span key={name} className="text-[11px] px-2 py-1 rounded-full bg-ink/[0.05] text-ink/60">
+                  {d.minutes} min walk to {name}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

@@ -71,7 +71,7 @@ router.get("/", async (req, res) => {
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
   const result = await query(
-    `SELECT h.id, h.name, h.area, h.gender_policy, h.includes, h.verified,
+    `SELECT h.id, h.name, h.area, h.gender_policy, h.includes, h.verified, h.landmark_distances,
             (SELECT m.url FROM media m WHERE m.hostel_id = h.id AND m.resource_type = 'image' ORDER BY m.created_at LIMIT 1) AS cover_photo,
             COUNT(b.id) AS total_beds,
             COUNT(b.id) FILTER (WHERE b.status = 'available') AS open_beds,

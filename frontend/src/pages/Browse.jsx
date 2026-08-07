@@ -127,6 +127,14 @@ export default function Browse() {
                   <p className="text-xs text-ink/50 flex items-center gap-1 mt-0.5">
                     <MapPin size={12} /> {h.area}
                   </p>
+                  {h.landmark_distances && Object.keys(h.landmark_distances).length > 0 && (
+                    <p className="text-xs text-forest mt-0.5">
+                      {(() => {
+                        const closest = Object.entries(h.landmark_distances).sort((a, b) => a[1].minutes - b[1].minutes)[0];
+                        return `${closest[1].minutes} min walk to ${closest[0]}`;
+                      })()}
+                    </p>
+                  )}
                 </div>
                 {h.verified && <ShieldCheck size={18} className="text-forest shrink-0" />}
               </div>
