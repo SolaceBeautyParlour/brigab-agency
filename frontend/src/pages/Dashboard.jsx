@@ -9,6 +9,8 @@ export default function Dashboard() {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [payingId, setPayingId] = useState(null);
+  const [payError, setPayError] = useState("");
 
   function load() {
     setLoading(true);
@@ -20,6 +22,18 @@ export default function Dashboard() {
   }
 
   useEffect(load, []);
+
+  async function payBalance(bookingId) {
+    setPayingId(bookingId);
+    setPayError("");
+    try {
+      const payment = await api.initializeBalancePayment(bookingId);
+      window.location.href = payment.authorization_url;
+    } catch (err) {
+      setPayError(err.message || "Couldn't start payment. Try again.");
+      setPayingId(null);
+    }
+  }
 
   if (loading) return <LoadingState message="Loading your bookings…" fullPage />;
 
@@ -63,11 +77,15 @@ export default function Dashboard() {
                   <CalendarClock size={13} /> Balance due {new Date(b.balance_due_date).toDateString()}
                 </div>
                 <button
-                  onClick={() => alert("In production this opens a Paystack checkout for the remaining balance, then calls api.payBalance().")}
-                  className="mt-3 text-sm font-medium bg-ink text-paper px-4 py-2 rounded-full hover:bg-rust"
+                  onClick={() => payBalance(b.id)}
+                  disabled={payingId === b.id}
+                  className="mt-3 text-sm font-medium bg-ink text-paper px-4 py-2 rounded-full hover:bg-rust disabled:opacity-50"
                 >
-                  Pay remaining {cedis(b.balance_amount)}
+                  {payingId === b.id ? "Redirecting…" : `Pay remaining ${cedis(b.balance_amount)}`}
                 </button>
+                {payError && payingId === b.id && (
+                  <p role="alert" className="text-rust text-xs mt-2">{payError}</p>
+                )}
               </>
             )}
           </div>

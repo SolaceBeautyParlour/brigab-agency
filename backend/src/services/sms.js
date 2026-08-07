@@ -95,4 +95,8 @@ export const smsTemplates = {
     `Hi ${name}, a bed just opened up at ${hostelName} (room ${roomCode})! You have 24 hours to claim it on Brigab before it passes to the next student.`,
   newBookingManager: (studentName, roomCode, depositAmount) =>
     `New booking at your hostel! ${studentName} just paid GHS ${depositAmount} for room ${roomCode}. Check your Brigab dashboard for details.`,
+  balancePaid: (name, roomCode) =>
+    `Hi ${name}, your balance for room ${roomCode} is fully paid. You're all settled — see you on campus!`,
+  balancePaidManager: (studentName, roomCode, amount) =>
+    `${studentName} just paid off the remaining GHS ${amount} balance for room ${roomCode}. That booking is now fully settled.`,
 };

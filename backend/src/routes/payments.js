@@ -124,19 +124,84 @@ router.post("/verify", requireAuth, requireRole("student"), async (req, res) => 
   res.status(201).json(booking);
 });
 
-/** Pay off the remaining balance later from the dashboard. */
-router.post("/pay-balance", requireAuth, requireRole("student"), async (req, res) => {
+/**
+ * Confirms a balance payment. Same non-negotiable rule as the deposit flow:
+ * the actual amount paid is derived from Paystack's own verified record,
+ * never trusted from the client — this is exactly the gap the old version
+ * of this route had (it marked a booking fully paid on ANY successful
+ * transaction reference, regardless of amount, which is a real money bug).
+ */
+router.post("/verify-balance", requireAuth, requireRole("student"), async (req, res) => {
   const { bookingId, reference } = req.body;
+
   const verified = await verifyTransaction(reference);
   if (verified.status !== "success") {
-    return res.status(402).json({ error: "Payment was not successful" });
+    return res.status(402).json({ error: "Payment was not successful", detail: verified.gateway_response });
+  }
+
+  const bookingResult = await query(
+    `SELECT bo.*, r.room_code, h.name AS hostel_name, u.name AS manager_name, u.email AS manager_email, u.phone AS manager_phone
+     FROM bookings bo
+     JOIN beds be ON be.id = bo.bed_id
+     JOIN rooms r ON r.id = be.room_id
+     JOIN hostels h ON h.id = r.hostel_id
+     JOIN users u ON u.id = h.manager_id
+     WHERE bo.id = $1 AND bo.student_id = $2`,
+    [bookingId, req.user.id]
+  );
+  const booking = bookingResult.rows[0];
+  if (!booking) return res.status(404).json({ error: "Booking not found" });
+  if (booking.status !== "deposit_paid") {
+    return res.status(409).json({ error: "This booking isn't awaiting a balance payment." });
+  }
+
+  const totalPaidGHS = Number(verified.amount) / 100;
+  const paystackFeeActual = Math.round(totalPaidGHS * PAYSTACK_FEE_RATE * 100) / 100;
+  const balancePaid = totalPaidGHS - paystackFeeActual;
+  const balanceOwed = Number(booking.balance_amount);
+
+  if (balancePaid < balanceOwed - 0.5) {
+    return res.status(402).json({
+      error: "The amount paid doesn't cover the outstanding balance. Contact support before this is marked as paid.",
+    });
   }
 
   const result = await query(
-    `UPDATE bookings SET status = 'balance_paid' WHERE id = $1 AND student_id = $2 RETURNING *`,
-    [bookingId, req.user.id]
+    "UPDATE bookings SET status = 'balance_paid' WHERE id = $1 RETURNING *",
+    [bookingId]
   );
-  if (!result.rows.length) return res.status(404).json({ error: "Booking not found" });
+
+  try {
+    const student = (await query("SELECT name, email, phone FROM users WHERE id = $1", [req.user.id])).rows[0];
+
+    await sendSMS(student.phone, smsTemplates.balancePaid(student.name, booking.room_code));
+    await sendReceiptEmail({
+      to: student.email,
+      name: student.name,
+      hostelName: booking.hostel_name,
+      roomCode: booking.room_code,
+      deposit: booking.deposit_amount,
+      serviceFee: 0,
+      balance: 0,
+      dueDate: "Paid in full",
+      reference,
+    });
+
+    await sendSMS(booking.manager_phone, smsTemplates.balancePaidManager(student.name, booking.room_code, balanceOwed));
+    await sendManagerBookingEmail({
+      to: booking.manager_email,
+      managerName: booking.manager_name,
+      studentName: student.name,
+      studentPhone: student.phone,
+      hostelName: booking.hostel_name,
+      roomCode: booking.room_code,
+      depositAmount: balanceOwed,
+      balanceAmount: 0,
+    });
+  } catch (notifyErr) {
+    console.error("Balance payment succeeded but notification failed:", notifyErr);
+  }
+
   res.json(result.rows[0]);
 });
 

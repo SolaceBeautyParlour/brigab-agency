@@ -142,6 +142,53 @@ router.post("/initialize-payment", requireAuth, requireRole("student"), async (r
 });
 
 /**
+ * Initialize payment for the REMAINING balance on an existing booking — not
+ * a new deposit. No new Brigab service fee here (that was already charged
+ * at deposit time); this is a pure pass-through to the manager, with only
+ * Paystack's own processing fee added transparently, same gross-up logic
+ * as the deposit flow.
+ */
+router.post("/initialize-balance-payment", requireAuth, requireRole("student"), async (req, res) => {
+  const { bookingId } = req.body;
+
+  const bookingResult = await query(
+    `SELECT bo.*, h.paystack_subaccount_code
+     FROM bookings bo
+     JOIN beds be ON be.id = bo.bed_id
+     JOIN rooms r ON r.id = be.room_id
+     JOIN hostels h ON h.id = r.hostel_id
+     WHERE bo.id = $1 AND bo.student_id = $2`,
+    [bookingId, req.user.id]
+  );
+  const booking = bookingResult.rows[0];
+  if (!booking) return res.status(404).json({ error: "Booking not found" });
+  if (booking.status !== "deposit_paid") {
+    return res.status(409).json({ error: "This booking isn't awaiting a balance payment." });
+  }
+
+  const balanceOwed = Number(booking.balance_amount);
+  const paystackFee = calculatePaystackFee(balanceOwed);
+  const total = balanceOwed + paystackFee;
+
+  const student = (await query("SELECT email FROM users WHERE id = $1", [req.user.id])).rows[0];
+  const reference = `BRG-BAL-${crypto.randomBytes(6).toString("hex")}`;
+  const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173").split(",")[0];
+  const callbackUrl = `${frontendUrl}/payment-callback?bookingId=${bookingId}&type=balance`;
+
+  const paystackData = await initializeSplitTransaction({
+    email: student.email,
+    amountGHS: total,
+    depositGHS: balanceOwed, // the manager's subaccount gets the full balance, untouched
+    subaccountCode: booking.paystack_subaccount_code,
+    reference,
+    metadata: { bookingId, studentId: req.user.id, type: "balance" },
+    callbackUrl,
+  });
+
+  res.json(paystackData);
+});
+
+/**
  * Manually list bookings for the logged-in student's dashboard.
  * Actual booking creation happens in payments.js after Paystack verification.
  */

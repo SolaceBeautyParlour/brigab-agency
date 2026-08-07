@@ -111,7 +111,8 @@ export const api = {
   holdBed: (bedId) => request("/bookings/hold", { method: "POST", body: { bedId } }),
   initializePayment: (payload) => request("/bookings/initialize-payment", { method: "POST", body: payload }),
   verifyPayment: (payload) => request("/payments/verify", { method: "POST", body: payload }),
-  payBalance: (payload) => request("/payments/pay-balance", { method: "POST", body: payload }),
+  initializeBalancePayment: (bookingId) => request("/bookings/initialize-balance-payment", { method: "POST", body: { bookingId } }),
+  verifyBalancePayment: (payload) => request("/payments/verify-balance", { method: "POST", body: payload }),
   myBookings: () => request("/bookings/mine"),
 
   joinWaitlist: (roomId) => request("/waitlist/join", { method: "POST", body: { roomId } }),
