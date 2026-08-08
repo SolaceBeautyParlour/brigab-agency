@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { Image as ImageIcon, Video, Plus, X, Loader2 } from "lucide-react";
 import { api } from "../api/client.js";
+import MediaLightbox from "./MediaLightbox.jsx";
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
@@ -32,6 +33,7 @@ export default function MediaGallery({ initialItems, managerMode, uploadFn, altL
   const [items, setItems] = useState(initialItems || []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [lightboxIndex, setLightboxIndex] = useState(null);
   const inputRef = useRef(null);
 
   async function handleFile(e) {
@@ -87,6 +89,7 @@ export default function MediaGallery({ initialItems, managerMode, uploadFn, altL
       const next = items.filter((m) => m.id !== mediaId);
       setItems(next);
       onChanged?.(next);
+      setLightboxIndex(null); // simplest safe behavior if deleting mid-view
     } catch (err) {
       setError(err.message || "Couldn't delete this.");
     }
@@ -97,14 +100,21 @@ export default function MediaGallery({ initialItems, managerMode, uploadFn, altL
   return (
     <div className="mt-2">
       <div className="flex gap-1.5 overflow-x-auto pb-1">
-        {items.map((m) => (
+        {items.map((m, i) => (
           <div key={m.id} className="relative shrink-0 w-16 h-16 rounded-md overflow-hidden bg-ink/5 border border-ink/10">
-            {m.resource_type === "video" ? (
-              <video src={m.url} className="w-full h-full object-cover" muted playsInline />
-            ) : (
-              <img src={m.url} alt={altLabel} className="w-full h-full object-cover" />
-            )}
-            <span className="absolute bottom-0.5 left-0.5 bg-ink/60 rounded p-0.5" aria-hidden="true">
+            <button
+              type="button"
+              onClick={() => setLightboxIndex(i)}
+              aria-label={`View ${altLabel} full size`}
+              className="w-full h-full outline-none focus-visible:ring-2 focus-visible:ring-rust focus-visible:ring-inset"
+            >
+              {m.resource_type === "video" ? (
+                <video src={m.url} className="w-full h-full object-cover" muted playsInline />
+              ) : (
+                <img src={m.url} alt={altLabel} className="w-full h-full object-cover" />
+              )}
+            </button>
+            <span className="absolute bottom-0.5 left-0.5 bg-ink/60 rounded p-0.5 pointer-events-none" aria-hidden="true">
               {m.resource_type === "video" ? <Video size={10} className="text-paper" /> : <ImageIcon size={10} className="text-paper" />}
             </span>
             {managerMode && (
@@ -145,6 +155,15 @@ export default function MediaGallery({ initialItems, managerMode, uploadFn, altL
         </p>
       )}
       {error && <p role="alert" className="text-rust text-xs mt-1">{error}</p>}
+      {lightboxIndex !== null && (
+        <MediaLightbox
+          items={items}
+          index={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onNavigate={setLightboxIndex}
+          altLabel={altLabel}
+        />
+      )}
     </div>
   );
 }

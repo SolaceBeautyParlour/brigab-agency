@@ -5,6 +5,7 @@ import { api, sessionAuth } from "../api/client.js";
 import BedGrid from "../components/BedGrid.jsx";
 import ReservationModal from "../components/ReservationModal.jsx";
 import LoadingState from "../components/LoadingState.jsx";
+import MediaGallery from "../components/MediaGallery.jsx";
 
 export default function HostelDetail() {
   const { id } = useParams();
@@ -94,6 +95,12 @@ export default function HostelDetail() {
           ))}
         </div>
       </div>
+
+      {hostel.media && hostel.media.length > 0 && (
+        <div className="px-6 sm:px-10 mb-4">
+          <MediaGallery initialItems={hostel.media} managerMode={false} altLabel={`${hostel.name} photo`} />
+        </div>
+      )}
 
       {waitlistNotice && (
         <div className="px-6 sm:px-10">
