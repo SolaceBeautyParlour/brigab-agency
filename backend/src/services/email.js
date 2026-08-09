@@ -1,13 +1,51 @@
-import nodemailer from "nodemailer";
 import "dotenv/config";
 
-const transporter = process.env.SMTP_HOST
-  ? nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT || 587),
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    })
-  : null;
+// Switched from nodemailer/SMTP to Brevo's HTTP API. This isn't a style
+// preference — Render's free web services block outbound traffic on SMTP
+// ports 25, 465, and 587 entirely (confirmed via Render's own changelog,
+// September 2025). No SMTP credentials, correct or not, will ever get
+// through on the free tier. Brevo sends over plain HTTPS instead, which is
+// never blocked, and its free tier (300 emails/day) needs no domain of your
+// own — without one, it just sends via a shared @brevosend.com address
+// instead of your own domain, which is a cosmetic tradeoff, not a blocker.
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const FROM_EMAIL = process.env.EMAIL_FROM || "no-reply@brigab.agency";
+const FROM_NAME = "Brigab Agency";
+
+async function sendViaBrevo({ to, subject, html }) {
+  let res;
+  try {
+    res = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "api-key": BREVO_API_KEY,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        sender: { name: FROM_NAME, email: FROM_EMAIL },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
+    });
+  } catch (err) {
+    console.error("Brevo network error:", err.message);
+    throw new Error("Couldn't reach the email service right now.");
+  }
+
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error("Email service returned an unexpected response.");
+  }
+
+  if (!res.ok) {
+    throw new Error(`Email send failed: ${data.message || JSON.stringify(data)}`);
+  }
+  return data;
+}
 
 export async function sendReceiptEmail({ to, name, hostelName, roomCode, deposit, serviceFee, balance, dueDate, reference }) {
   const html = `
@@ -28,17 +66,12 @@ export async function sendReceiptEmail({ to, name, hostelName, roomCode, deposit
     </div>
   `;
 
-  if (!transporter) {
+  if (!BREVO_API_KEY) {
     console.log(`[Email - not configured, logging only] to ${to}: receipt for ${reference}`);
     return { skipped: true };
   }
 
-  return transporter.sendMail({
-    from: `"Brigab Agency" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
-    to,
-    subject: `Your room at ${hostelName} is secured`,
-    html,
-  });
+  return sendViaBrevo({ to, subject: `Your room at ${hostelName} is secured`, html });
 }
 
 export async function sendManagerBookingEmail({ to, managerName, studentName, studentPhone, hostelName, roomCode, depositAmount, balanceAmount }) {
@@ -58,15 +91,10 @@ export async function sendManagerBookingEmail({ to, managerName, studentName, st
     </div>
   `;
 
-  if (!transporter) {
+  if (!BREVO_API_KEY) {
     console.log(`[Email - not configured, logging only] to ${to}: new booking notification for room ${roomCode}`);
     return { skipped: true };
   }
 
-  return transporter.sendMail({
-    from: `"Brigab Agency" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
-    to,
-    subject: `New booking: room ${roomCode} at ${hostelName}`,
-    html,
-  });
+  return sendViaBrevo({ to, subject: `New booking: room ${roomCode} at ${hostelName}`, html });
 }
