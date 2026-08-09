@@ -158,7 +158,7 @@ export default function MapPicker({ initialLat, initialLng, onSave }) {
         </div>
       )}
 
-      <div ref={mapRef} className="w-full h-64 rounded-lg border border-ink/10 mb-2" />
+      <div ref={mapRef} className="w-full h-64 rounded-lg border border-ink/10 mb-2 isolate" style={{ position: "relative" }} />
 
       <p className="text-[11px] text-ink/40 mb-2">
         Click anywhere on the map to drop a pin, or drag it to fine-tune. Search above to jump to an address first.
