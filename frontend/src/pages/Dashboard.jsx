@@ -71,7 +71,7 @@ export default function Dashboard() {
               <div><p className="text-xs text-ink/40">Deposit paid</p>{cedis(b.deposit_amount)}</div>
               <div><p className="text-xs text-ink/40">Balance remaining</p>{cedis(b.balance_amount)}</div>
             </div>
-            {b.status === "deposit_paid" && (
+            {b.status === "deposit_paid" && Number(b.balance_amount) > 0 && (
               <>
                 <div className="flex items-center gap-1.5 mt-3 text-xs text-ink/50">
                   <CalendarClock size={13} /> Balance due {new Date(b.balance_due_date).toDateString()}
@@ -87,6 +87,9 @@ export default function Dashboard() {
                   <p role="alert" className="text-rust text-xs mt-2">{payError}</p>
                 )}
               </>
+            )}
+            {b.status === "deposit_paid" && Number(b.balance_amount) <= 0 && (
+              <p className="text-xs text-forest mt-3">Fully paid — nothing left owed on this booking.</p>
             )}
           </div>
         ))}

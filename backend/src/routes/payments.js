@@ -64,10 +64,16 @@ router.post("/verify", requireAuth, requireRole("student"), async (req, res) => 
     await client.query("BEGIN");
     await client.query("UPDATE beds SET status = 'taken', hold_expires_at = NULL WHERE id = $1", [bedId]);
 
+    // A student can pay up to the full room price upfront (the deposit
+    // slider goes to 100%) — if they did, this booking is already fully
+    // settled and should say so from the start, not sit stuck as
+    // "deposit_paid" forever with a balance of zero and no way to close it.
+    const initialStatus = balance <= 0 ? "balance_paid" : "deposit_paid";
+
     const bookingResult = await client.query(
       `INSERT INTO bookings (student_id, bed_id, deposit_amount, service_fee, balance_amount, balance_due_date, status, paystack_ref, grace_period_ends_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 'deposit_paid', $7, $8) RETURNING *`,
-      [req.user.id, bedId, deposit, SERVICE_FEE, balance, balanceDueDate, reference, graceEnd]
+       VALUES ($1, $2, $3, $4, $5, $6, $9, $7, $8) RETURNING *`,
+      [req.user.id, bedId, deposit, SERVICE_FEE, balance, balanceDueDate, reference, graceEnd, initialStatus]
     );
     booking = bookingResult.rows[0];
     await client.query("COMMIT");

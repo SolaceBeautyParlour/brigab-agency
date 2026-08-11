@@ -167,6 +167,9 @@ router.post("/initialize-balance-payment", requireAuth, requireRole("student"), 
   }
 
   const balanceOwed = Number(booking.balance_amount);
+  if (balanceOwed <= 0) {
+    return res.status(409).json({ error: "There's no balance left to pay on this booking." });
+  }
   const paystackFee = calculatePaystackFee(balanceOwed);
   const total = balanceOwed + paystackFee;
 
