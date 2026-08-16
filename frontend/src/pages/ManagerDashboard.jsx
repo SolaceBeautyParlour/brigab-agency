@@ -225,6 +225,10 @@ export default function ManagerDashboard() {
         </div>
       )}
 
+      {active && (
+        <AdditionalInfoEditor key={active.id} hostel={active} onSaved={refreshHostels} />
+      )}
+
       {active && !active.paystack_subaccount_code && (
         <div role="status" className="border border-gold/30 bg-gold/10 rounded-lg p-4 mb-6 flex items-start gap-3">
           <Banknote size={18} className="text-[#7a5c14] mt-0.5" aria-hidden="true" />
@@ -273,9 +277,18 @@ export default function ManagerDashboard() {
             <div className="space-y-2">
               {bookings.map((b) => (
                 <div key={b.id} className="flex items-center justify-between border border-ink/10 rounded-lg px-4 py-3 text-sm">
-                  <div>
-                    <p className="text-ink">{b.student_name} · Room {b.room_code}</p>
-                    <p className="text-ink/40 text-xs">{b.student_phone}</p>
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full overflow-hidden bg-ink/[0.06] flex items-center justify-center shrink-0">
+                      {b.student_photo ? (
+                        <img src={b.student_photo} alt={`${b.student_name} photo`} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-ink/30 text-xs font-medium">{b.student_name?.[0]?.toUpperCase()}</span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-ink">{b.student_name} · Room {b.room_code}</p>
+                      <p className="text-ink/40 text-xs">{b.student_phone}</p>
+                    </div>
                   </div>
                   <span className="font-mono text-xs text-ink/60 uppercase">{b.status}</span>
                 </div>
@@ -355,6 +368,55 @@ export default function ManagerDashboard() {
   );
 }
 
+function AdditionalInfoEditor({ hostel, onSaved }) {
+  const [text, setText] = useState(hostel.additional_info || "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  async function save() {
+    setSaving(true);
+    setError("");
+    try {
+      await api.updateHostelAdditionalInfo(hostel.id, text);
+      setSaved(true);
+      onSaved?.();
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      setError(err.message || "Couldn't save this.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="mb-6">
+      <p className="font-mono text-[11px] uppercase tracking-wide text-ink/50 mb-1.5">
+        {hostel.name} — additional info for students
+      </p>
+      <textarea
+        rows={3}
+        maxLength={2000}
+        placeholder="Anything a student should know before booking — house rules, visitor policy, on-site landlord, etc."
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        className="w-full border border-ink/15 rounded-lg px-4 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-rust resize-none"
+      />
+      <div className="flex items-center gap-3 mt-2">
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving}
+          className="bg-ink text-paper rounded-full px-4 py-1.5 text-xs font-medium hover:bg-rust disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-rust"
+        >
+          {saving ? "Saving…" : saved ? "Saved ✓" : "Save"}
+        </button>
+        {error && <p role="alert" className="text-rust text-xs">{error}</p>}
+      </div>
+    </div>
+  );
+}
+
 function ConnectPaystackForm({ hostelId, onDone }) {
   const [form, setForm] = useState({ businessName: "", bankCode: "", accountNumber: "" });
   const [banks, setBanks] = useState([]);
@@ -424,7 +486,7 @@ function ConnectPaystackForm({ hostelId, onDone }) {
 }
 
 function NewHostelModal({ onClose, onCreated }) {
-  const [form, setForm] = useState({ name: "", area: "", genderPolicy: "mixed", depositPct: 0.35, includes: [] });
+  const [form, setForm] = useState({ name: "", area: "", genderPolicy: "mixed", depositPct: 0.35, includes: [], additionalInfo: "" });
   const [error, setError] = useState("");
   const [amenityOptions, setAmenityOptions] = useState([]);
 
@@ -489,6 +551,20 @@ function NewHostelModal({ onClose, onCreated }) {
             />
           </div>
         )}
+        <div>
+          <label htmlFor="h-info" className="text-xs text-ink/50 block mb-1">
+            Additional info for students (optional)
+          </label>
+          <textarea
+            id="h-info"
+            rows={3}
+            maxLength={2000}
+            placeholder="Anything a student should know before booking — house rules, visitor policy, on-site landlord, etc."
+            value={form.additionalInfo}
+            onChange={(e) => setForm((f) => ({ ...f, additionalInfo: e.target.value }))}
+            className="w-full border border-ink/15 rounded-lg px-4 py-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-rust resize-none"
+          />
+        </div>
         <button type="submit" className="w-full bg-ink text-paper rounded-full py-2.5 font-medium hover:bg-rust outline-none focus-visible:ring-2 focus-visible:ring-rust">
           Create hostel
         </button>

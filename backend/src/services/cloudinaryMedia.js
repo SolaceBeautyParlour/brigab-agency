@@ -43,3 +43,24 @@ export function uploadRoomMedia(buffer, resourceType) {
 export function deleteRoomMedia(publicId, resourceType) {
   return cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
 }
+
+/**
+ * Profile photos get their own settings — a small square crop centered on
+ * the face where possible, not the wide-format room-photo treatment. Kept
+ * as a separate function rather than overloading uploadRoomMedia's options,
+ * since the two will likely keep diverging (e.g. moderation rules later).
+ */
+export function uploadProfilePhoto(buffer) {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        resource_type: "image",
+        folder: "brigab/profiles",
+        eager: [{ width: 400, height: 400, crop: "thumb", gravity: "face", quality: "auto", fetch_format: "auto" }],
+        eager_async: false,
+      },
+      (err, result) => (err ? reject(err) : resolve(result))
+    );
+    stream.end(buffer);
+  });
+}

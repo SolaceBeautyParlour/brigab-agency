@@ -102,6 +102,15 @@ export default function HostelDetail() {
         </div>
       )}
 
+      {hostel.additional_info && (
+        <div className="px-6 sm:px-10 mb-4">
+          <div className="border border-ink/10 rounded-lg p-4 bg-white/60">
+            <p className="font-mono text-[11px] uppercase tracking-wide text-ink/50 mb-1.5">Good to know</p>
+            <p className="text-sm text-ink/70 whitespace-pre-wrap">{hostel.additional_info}</p>
+          </div>
+        </div>
+      )}
+
       {waitlistNotice && (
         <div className="px-6 sm:px-10">
           <p className="bg-gold/10 text-[#7a5c14] text-sm rounded-lg px-4 py-3 mb-4">{waitlistNotice}</p>

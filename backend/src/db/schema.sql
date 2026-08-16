@@ -170,3 +170,13 @@ END $$;
 ALTER TABLE hostels ADD COLUMN IF NOT EXISTS latitude NUMERIC(10,7);
 ALTER TABLE hostels ADD COLUMN IF NOT EXISTS longitude NUMERIC(10,7);
 ALTER TABLE hostels ADD COLUMN IF NOT EXISTS landmark_distances JSONB DEFAULT '{}';
+
+-- Student profile photo — optional, skippable at signup. Nullable on
+-- purpose; a manager account never sets these.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo_url TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo_public_id TEXT;
+
+-- Free-text note a manager can add for anything a student should know
+-- before booking that doesn't fit a structured field (e.g. "no visitors
+-- after 9pm", "landlord lives on-site", house rules, etc).
+ALTER TABLE hostels ADD COLUMN IF NOT EXISTS additional_info TEXT;

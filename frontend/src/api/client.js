@@ -132,6 +132,9 @@ export const api = {
   deleteRoom: (roomId) => request(`/manager/rooms/${roomId}`, { method: "DELETE" }),
   uploadRoomMedia: (roomId, file) => uploadFile(`/manager/rooms/${roomId}/media`, file),
   uploadHostelMedia: (hostelId, file) => uploadFile(`/manager/hostels/${hostelId}/media`, file),
+  uploadProfilePhoto: (file) => uploadFile("/auth/profile-photo", file),
+  updateHostelAdditionalInfo: (hostelId, additionalInfo) =>
+    request(`/manager/hostels/${hostelId}/additional-info`, { method: "PATCH", body: { additionalInfo } }),
   deleteMedia: (mediaId) => request(`/manager/media/${mediaId}`, { method: "DELETE" }),
   toggleBed: (bedId, status, confirmOverride) => request(`/manager/beds/${bedId}`, { method: "PATCH", body: { status, confirmOverride } }),
   managerBookings: (hostelId) => request(`/manager/hostels/${hostelId}/bookings`),

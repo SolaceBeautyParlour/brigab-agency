@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import { api, sessionAuth } from "../api/client.js";
 import PasswordField from "../components/PasswordField.jsx";
 
@@ -7,6 +8,11 @@ export default function Signup({ onAuthed }) {
   const [role, setRole] = useState("student");
   const [form, setForm] = useState({ name: "", email: "", phone: "", password: "", gender: "" });
   const [error, setError] = useState(null);
+  const [step, setStep] = useState("form"); // form | photo
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState("");
   const navigate = useNavigate();
 
   function update(field) {
@@ -21,10 +27,84 @@ export default function Signup({ onAuthed }) {
       sessionAuth.token = token;
       sessionAuth.user = user;
       onAuthed(user);
-      navigate(role === "manager" ? "/manager" : "/dashboard");
+      // Students get an optional photo step right after account creation —
+      // managers don't need one, so they go straight in.
+      if (role === "student") {
+        setStep("photo");
+      } else {
+        navigate("/manager");
+      }
     } catch (e) {
       setError(e.message);
     }
+  }
+
+  function handlePhotoSelect(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoFile(file);
+    setPhotoError("");
+    setPhotoPreview(URL.createObjectURL(file));
+  }
+
+  async function handlePhotoUpload() {
+    if (!photoFile) return;
+    setUploadingPhoto(true);
+    setPhotoError("");
+    try {
+      const { profilePhotoUrl } = await api.uploadProfilePhoto(photoFile);
+      sessionAuth.user = { ...sessionAuth.user, profile_photo_url: profilePhotoUrl };
+      navigate("/dashboard");
+    } catch (err) {
+      setPhotoError(err.message || "Couldn't upload that photo. You can add one later.");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  }
+
+  if (step === "photo") {
+    return (
+      <div className="max-w-sm mx-auto px-6 py-16 text-center">
+        <h1 className="font-display text-2xl text-ink mb-1">Add a profile photo?</h1>
+        <p className="text-sm text-ink/50 mb-6">
+          Helps hostel managers recognize who's booking. Totally optional — skip if you'd rather not.
+        </p>
+
+        <div className="w-28 h-28 rounded-full mx-auto mb-5 bg-ink/[0.06] overflow-hidden flex items-center justify-center border border-ink/10">
+          {photoPreview ? (
+            <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-ink/30 text-xs">No photo</span>
+          )}
+        </div>
+
+        <label className="inline-block text-sm font-medium text-ink underline underline-offset-4 hover:text-rust cursor-pointer mb-4">
+          {photoFile ? "Choose a different photo" : "Choose a photo"}
+          <input type="file" accept="image/*" onChange={handlePhotoSelect} className="sr-only" />
+        </label>
+
+        {photoError && <p role="alert" className="text-rust text-sm mb-3">{photoError}</p>}
+
+        <div className="flex flex-col gap-2 mt-2">
+          <button
+            type="button"
+            onClick={handlePhotoUpload}
+            disabled={!photoFile || uploadingPhoto}
+            className="w-full bg-ink text-paper rounded-full py-2.5 font-medium hover:bg-rust disabled:opacity-50 outline-none focus-visible:ring-2 focus-visible:ring-rust flex items-center justify-center gap-2"
+          >
+            {uploadingPhoto ? <Loader2 size={16} className="animate-spin" /> : null}
+            {uploadingPhoto ? "Uploading…" : "Save and continue"}
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/dashboard")}
+            className="text-sm text-ink/50 hover:text-ink py-1"
+          >
+            Skip for now
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

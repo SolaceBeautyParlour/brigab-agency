@@ -25,13 +25,14 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX
 
 /** Create a hostel listing. Free — no subscription, ever. */
 router.post("/hostels", async (req, res) => {
-  const { name, area, genderPolicy, includes, depositPct } = req.body;
+  const { name, area, genderPolicy, includes, depositPct, additionalInfo } = req.body;
   const safeAmenities = sanitizeAmenities(includes, HOSTEL_AMENITIES);
   const safeDepositPct = Math.min(1, Math.max(0.1, Number(depositPct) || 0.35));
+  const safeAdditionalInfo = (additionalInfo || "").trim().slice(0, 2000) || null;
   const result = await query(
-    `INSERT INTO hostels (manager_id, name, area, gender_policy, includes, deposit_pct)
-     VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-    [req.user.id, name, area, genderPolicy || "mixed", safeAmenities, safeDepositPct]
+    `INSERT INTO hostels (manager_id, name, area, gender_policy, includes, deposit_pct, additional_info)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+    [req.user.id, name, area, genderPolicy || "mixed", safeAmenities, safeDepositPct, safeAdditionalInfo]
   );
   res.status(201).json(result.rows[0]);
 });
@@ -184,6 +185,19 @@ async function getOrGeocodeLandmark(landmark) {
  * update, which is what keeps this comfortably inside a free daily quota
  * no matter how many students later browse the site.
  */
+/** Update the free-text note shown to students on the hostel's page. */
+router.patch("/hostels/:hostelId/additional-info", async (req, res) => {
+  const owns = await query("SELECT id FROM hostels WHERE id = $1 AND manager_id = $2", [req.params.hostelId, req.user.id]);
+  if (!owns.rows.length) return res.status(403).json({ error: "You don't manage this hostel" });
+
+  const safeAdditionalInfo = (req.body.additionalInfo || "").trim().slice(0, 2000) || null;
+  const result = await query(
+    "UPDATE hostels SET additional_info = $1 WHERE id = $2 RETURNING *",
+    [safeAdditionalInfo, req.params.hostelId]
+  );
+  res.json(result.rows[0]);
+});
+
 router.patch("/hostels/:hostelId/location", async (req, res) => {
   const { latitude, longitude } = req.body;
   const owns = await query("SELECT id FROM hostels WHERE id = $1 AND manager_id = $2", [req.params.hostelId, req.user.id]);
@@ -489,7 +503,7 @@ router.get("/hostels/:hostelId/bookings", async (req, res) => {
   if (!owns.rows.length) return res.status(403).json({ error: "You don't manage this hostel" });
 
   const result = await query(
-    `SELECT bo.*, u.name AS student_name, u.phone AS student_phone, r.room_code
+    `SELECT bo.*, u.name AS student_name, u.phone AS student_phone, u.profile_photo_url AS student_photo, r.room_code
      FROM bookings bo
      JOIN beds be ON be.id = bo.bed_id
      JOIN rooms r ON r.id = be.room_id

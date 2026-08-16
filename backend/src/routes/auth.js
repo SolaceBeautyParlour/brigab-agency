@@ -1,9 +1,13 @@
 import express from "express";
 import bcrypt from "bcryptjs";
+import multer from "multer";
 import { query } from "../db/pool.js";
 import { signToken } from "../utils/jwt.js";
+import { requireAuth } from "../middleware/auth.js";
+import { uploadProfilePhoto, deleteRoomMedia, MAX_IMAGE_BYTES } from "../services/cloudinaryMedia.js";
 
 const router = express.Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_IMAGE_BYTES } });
 
 const GHANA_PHONE_RE = /^(\+233|0)[2357][0-9]{8}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -62,6 +66,43 @@ router.post("/login", async (req, res) => {
 
   const { password_hash, ...safeUser } = user;
   res.json({ user: safeUser, token: signToken(user) });
+});
+
+/**
+ * Uploads or replaces the logged-in student's profile photo. Deliberately
+ * NOT part of the /signup payload itself — signup stays a plain JSON
+ * request with no file handling, and this is a separate step the frontend
+ * offers immediately after (skippable), same "create first, attach media
+ * after" pattern already used for hostels and rooms.
+ */
+router.post("/profile-photo", requireAuth, upload.single("file"), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file was uploaded." });
+  if (!req.file.mimetype.startsWith("image/")) {
+    return res.status(415).json({ error: "Only images are supported for a profile photo." });
+  }
+
+  const existing = (await query("SELECT profile_photo_public_id FROM users WHERE id = $1", [req.user.id])).rows[0];
+
+  let uploadResult;
+  try {
+    uploadResult = await uploadProfilePhoto(req.file.buffer);
+  } catch (err) {
+    return res.status(502).json({ error: "Upload to media storage failed. Please try again." });
+  }
+  const url = uploadResult.eager?.[0]?.secure_url || uploadResult.secure_url;
+
+  await query(
+    "UPDATE users SET profile_photo_url = $1, profile_photo_public_id = $2 WHERE id = $3",
+    [url, uploadResult.public_id, req.user.id]
+  );
+
+  // Best-effort cleanup of the old photo, if replacing one — never block
+  // the response on this, a stray orphaned file isn't worth failing over.
+  if (existing?.profile_photo_public_id) {
+    deleteRoomMedia(existing.profile_photo_public_id, "image").catch(() => {});
+  }
+
+  res.json({ profilePhotoUrl: url });
 });
 
 export default router;
